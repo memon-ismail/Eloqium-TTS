@@ -176,6 +176,11 @@ private fun AboutProjectSection() {
             Spacer(modifier = Modifier.height(8.dp))
             InfoRow(label = "Creator / Maintainer", value = "Ismail Memon")
             Spacer(modifier = Modifier.height(8.dp))
+            InfoRow(
+                label = "Special Thanks To",
+                value = "1. Chandu Rathod\n2. Yashraj Shinde"
+            )
+            Spacer(modifier = Modifier.height(8.dp))
             InfoRow(label = "Engine Identifier", value = "Eloqium TTS (org.eloqium.tts)")
             Spacer(modifier = Modifier.height(8.dp))
             InfoRow(label = "Version", value = "0.1.0")

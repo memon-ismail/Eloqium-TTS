@@ -46,6 +46,12 @@ Eloqium TTS is an independent open-source text-to-speech engine designed for And
 
 The project was created and is maintained by **Ismail Memon**.
 
+### Special Thanks To
+
+1. Chandu Rathod
+
+2. Yashraj Shinde
+
 Eloqium pairs an optimized native build of OpenEVV with modern Android accessibility services to deliver instantaneous response times and zero audio lag during rapid touch exploration and reading.
 
 ---
