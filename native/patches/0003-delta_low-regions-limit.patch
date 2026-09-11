@@ -1,0 +1,34 @@
+delta_low: increase REGIONS and made cache for multi-language builds
+
+When building an engine supporting multiple languages (such as Eloqium's 8
+genuine language modules simultaneously linked into one shared library), each
+language registers its stores and rule tables. The default REGIONS limit of
+512 is exceeded during initialization of the 7th/8th language, causing an
+abort() in delta_low_copy(). Furthermore, the lookup cache `made` of 16 entries
+overflows.
+
+Increasing REGIONS to 2048 and the `made` cache to 128 allows all 8 genuine
+OpenEVV language modules to be initialized and executed without memory
+exhaustion or abort().
+
+diff --git a/src/delta/delta_low.c b/src/delta/delta_low.c
+--- a/src/delta/delta_low.c
++++ b/src/delta/delta_low.c
+@@ -45,7 +45,7 @@
+    seventy-five and German ninety, plus two of dictionary entries apiece. A
+    language is registered the first time one of its machines is made, so a
+    program that never speaks the second one never spends its share. */
+-#define REGIONS 512
++#define REGIONS 2048
+ 
+ static struct {
+     const unsigned char *at;
+@@ -129,7 +129,7 @@ void *delta_low_copy(const void *what, size_t bytes)
+     static struct {
+         const void *what;
+         void       *copy;
+-    } made[16];
++    } made[128];
+     static int mades;
+ 
+     void *copy;

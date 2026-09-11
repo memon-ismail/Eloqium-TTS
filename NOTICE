@@ -1,0 +1,20 @@
+Eloqium TTS
+Copyright (c) 2026 Ismail Memon and Eloqium TTS contributors
+
+This product includes software developed by Ismail Memon and contributors to the Eloqium TTS project.
+
+This software incorporates or derives from components of the following projects:
+
+1. EVVDroid
+   Copyright (c) 2024-2025 trypsynth
+   Licensed under the Apache License, Version 2.0.
+
+2. OpenEVV (libevv)
+   Copyright (c) 2023-2025 Mudb0y and OpenEVV contributors
+   Licensed under the MIT License.
+   Portions copyright (c) International Business Machines Corporation (IBM),
+   governed by the IBM Speech Synthesis Language Rules Notice.
+
+3. Android Open Source Project (AOSP)
+   Copyright (c) The Android Open Source Project
+   Licensed under the Apache License, Version 2.0.

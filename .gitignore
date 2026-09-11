@@ -1,0 +1,17 @@
+*.wav
+*.mp3
+*.log
+references/
+build/
+.gradle/
+app/build/
+local.properties
+signing.properties
+secrets.properties
+*.apk
+*.aab
+.idea/
+*.iml
+test_build/
+*.keystore
+*.jks
