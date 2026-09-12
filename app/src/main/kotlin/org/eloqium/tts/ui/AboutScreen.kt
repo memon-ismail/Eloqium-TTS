@@ -183,7 +183,7 @@ private fun AboutProjectSection() {
             Spacer(modifier = Modifier.height(8.dp))
             InfoRow(label = "Engine Identifier", value = "Eloqium TTS (org.eloqium.tts)")
             Spacer(modifier = Modifier.height(8.dp))
-            InfoRow(label = "Version", value = "0.1.0")
+            InfoRow(label = "Version", value = "0.1.1")
             Spacer(modifier = Modifier.height(8.dp))
             InfoRow(label = "License", value = "Apache License 2.0 (Open Source)")
             Spacer(modifier = Modifier.height(8.dp))

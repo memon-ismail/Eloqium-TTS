@@ -81,6 +81,7 @@ fun SettingsScreen(
     var enableEmoji by remember { mutableStateOf(settings.enableEmoji) }
     var processPunctuation by remember { mutableStateOf(settings.processPunctuation) }
     var punctuationLevel by remember { mutableIntStateOf(settings.punctuationLevel) }
+    var customPunctuation by remember { mutableStateOf(settings.customPunctuation) }
     var useNumberProcessing by remember { mutableStateOf(settings.useNumberProcessing) }
     var numberProcessingMode by remember { mutableIntStateOf(settings.numberProcessingMode) }
     var useAbbreviations by remember { mutableStateOf(settings.useAbbreviations) }
@@ -105,7 +106,7 @@ fun SettingsScreen(
     var showSamplingDialog by remember { mutableStateOf(false) }
     var showResetDialog by remember { mutableStateOf(false) }
 
-    val punctLevels = listOf("None", "Some", "Most", "All")
+    val punctLevels = listOf("None", "Some", "Most", "All", "Custom")
     val numberModes = listOf("Digits", "Pairs", "Triplets")
 
     fun refreshAllFromSettings() {
@@ -124,6 +125,7 @@ fun SettingsScreen(
         enableEmoji = settings.enableEmoji
         processPunctuation = settings.processPunctuation
         punctuationLevel = settings.punctuationLevel
+        customPunctuation = settings.customPunctuation
         useNumberProcessing = settings.useNumberProcessing
         numberProcessingMode = settings.numberProcessingMode
         useAbbreviations = settings.useAbbreviations
@@ -520,10 +522,13 @@ fun SettingsScreen(
     PunctuationLevelDialog(
         visible = showPunctDialog,
         currentLevel = punctuationLevel,
+        customPunctuation = customPunctuation,
         levels = punctLevels,
-        onLevelSelected = {
-            punctuationLevel = it
-            settings.punctuationLevel = it
+        onConfirm = { level, customStr ->
+            punctuationLevel = level
+            customPunctuation = customStr
+            settings.punctuationLevel = level
+            settings.customPunctuation = customStr
             showPunctDialog = false
         },
         onDismiss = { showPunctDialog = false }

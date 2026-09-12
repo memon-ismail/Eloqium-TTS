@@ -28,6 +28,7 @@ object SettingsDefaults {
     const val KEY_EMOJI_EMOTICON = "emoji_emoticon"
     const val KEY_PROCESS_PUNCTUATION = "process_punctuation"
     const val KEY_PUNCTUATION_LEVEL = "punctuation_level"
+    const val KEY_CUSTOM_PUNCTUATION = "custom_punctuation"
     const val KEY_USE_NUMBER_PROCESSING = "use_number_processing"
     const val KEY_NUMBER_PROCESSING_MODE = "number_processing_mode"
     const val KEY_USE_ABBREVIATIONS = "use_abbreviations"
@@ -53,7 +54,8 @@ object SettingsDefaults {
     const val DEFAULT_BREATHINESS = 0 // Relative: -10..10 (0 maps to native baseline 0)
     const val DEFAULT_EMOJI_EMOTICON = true
     const val DEFAULT_PROCESS_PUNCTUATION = false
-    const val DEFAULT_PUNCTUATION_LEVEL = 0 // 0=None, 1=Some, 2=Most, 3=All
+    const val DEFAULT_PUNCTUATION_LEVEL = 0 // 0=None, 1=Some, 2=Most, 3=All, 4=Custom
+    const val DEFAULT_CUSTOM_PUNCTUATION = ""
     const val DEFAULT_USE_NUMBER_PROCESSING = false
     const val DEFAULT_NUMBER_PROCESSING_MODE = 0 // 0=Digits, 1=Pairs, 2=Triplets
     const val DEFAULT_USE_ABBREVIATIONS = true
@@ -69,6 +71,7 @@ object SettingsDefaults {
     const val PUNCT_SOME = 1
     const val PUNCT_MOST = 2
     const val PUNCT_ALL = 3
+    const val PUNCT_CUSTOM = 4
 
     // Number modes
     const val NUMBER_DIGITS = 0
@@ -177,8 +180,12 @@ class Settings(val prefs: SharedPreferences) {
         set(value) = prefs.edit().putBoolean(SettingsDefaults.KEY_PROCESS_PUNCTUATION, value).apply()
 
     var punctuationLevel: Int
-        get() = prefs.getInt(SettingsDefaults.KEY_PUNCTUATION_LEVEL, SettingsDefaults.DEFAULT_PUNCTUATION_LEVEL).coerceIn(0, 3)
-        set(value) = prefs.edit().putInt(SettingsDefaults.KEY_PUNCTUATION_LEVEL, value.coerceIn(0, 3)).apply()
+        get() = prefs.getInt(SettingsDefaults.KEY_PUNCTUATION_LEVEL, SettingsDefaults.DEFAULT_PUNCTUATION_LEVEL).coerceIn(0, 4)
+        set(value) = prefs.edit().putInt(SettingsDefaults.KEY_PUNCTUATION_LEVEL, value.coerceIn(0, 4)).apply()
+
+    var customPunctuation: String
+        get() = prefs.getString(SettingsDefaults.KEY_CUSTOM_PUNCTUATION, SettingsDefaults.DEFAULT_CUSTOM_PUNCTUATION) ?: SettingsDefaults.DEFAULT_CUSTOM_PUNCTUATION
+        set(value) = prefs.edit().putString(SettingsDefaults.KEY_CUSTOM_PUNCTUATION, value).apply()
 
     // Number processing & mode
     var useNumberProcessing: Boolean
@@ -245,6 +252,7 @@ class Settings(val prefs: SharedPreferences) {
             .putBoolean(SettingsDefaults.KEY_EMOJI_EMOTICON, SettingsDefaults.DEFAULT_EMOJI_EMOTICON)
             .putBoolean(SettingsDefaults.KEY_PROCESS_PUNCTUATION, SettingsDefaults.DEFAULT_PROCESS_PUNCTUATION)
             .putInt(SettingsDefaults.KEY_PUNCTUATION_LEVEL, SettingsDefaults.DEFAULT_PUNCTUATION_LEVEL)
+            .putString(SettingsDefaults.KEY_CUSTOM_PUNCTUATION, SettingsDefaults.DEFAULT_CUSTOM_PUNCTUATION)
             .putBoolean(SettingsDefaults.KEY_USE_NUMBER_PROCESSING, SettingsDefaults.DEFAULT_USE_NUMBER_PROCESSING)
             .putInt(SettingsDefaults.KEY_NUMBER_PROCESSING_MODE, SettingsDefaults.DEFAULT_NUMBER_PROCESSING_MODE)
             .putBoolean(SettingsDefaults.KEY_USE_ABBREVIATIONS, SettingsDefaults.DEFAULT_USE_ABBREVIATIONS)

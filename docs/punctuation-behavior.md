@@ -228,3 +228,35 @@ We compiled OpenEVV natively on Android/Termux (`clang 21.1.8`, `aarch64-unknown
 | **3. EVVDroid Pause Regex** | 11,025 Hz | 31,130 | **2.824 s** (+68%) | Artificial pause before terminal punctuation, decoupled question mark, broken clause boundary. |
 
 These empirical measurements confirm that disabling phrase prediction and injecting spaces before punctuation corrupts speech timing, roughly doubles utterance latency, and obliterates natural question intonation.
+
+---
+
+## 8. Custom Punctuation Level & Settings Architecture
+
+Eloqium TTS supports 5 distinct punctuation levels selectable via the **Punctuation Level** settings dialog:
+
+| Level Index | Mode | Spoken Characters | Behavior |
+| :--- | :--- | :--- | :--- |
+| `0` | **None** | *None* | Pure prosodic punctuation. Clause boundaries and pitch contours are preserved without spoken symbols. |
+| `1` | **Some** | `* / \ # % & + = @ ^ ~ < > \| $` | Verbalizes mathematical and syntax symbols; structural delimiters and sentence boundaries remain prosodic. |
+| `2` | **Most** | `Some` + `( ) [ ] { } " ' - – — _ : ;` | Verbalizes brackets, quotes, dashes, colons, and semicolons. Sentence-ending periods/commas remain prosodic. |
+| `3` | **All** | `Most` + `. , ? !` | Verbalizes all punctuation marks including clause and sentence terminators. |
+| `4` | **Custom** | *User-defined string* | Verbalizes **only** the exact symbols specified by the user. Unspecified marks provide natural prosody. |
+
+### 8.1 Custom Punctuation Design Principles
+
+1. **Strict User-Specified Scope**:
+   In Custom mode, Eloqium TTS speaks **only** the symbols explicitly specified by the user in the `custom_punctuation` setting. It does not implicitly include the `Some`, `Most`, or `All` symbol sets.
+2. **Prosody Preservation for Unselected Marks**:
+   Punctuation marks and clause terminators not included in the custom string are never discarded or detached; they remain tightly bound to the preceding tokens so the engine generates natural clause pauses and question/assertive pitch contours.
+3. **Number and Intonation Protection**:
+   Decimals (`3.14`), thousands separators (`1,000`), times (`12:30`), abbreviations (`Dr.`, `e.g.`), and question marks (`?`) remain protected against inappropriate decomposition even when general symbols are active.
+4. **Deduplication and Whitespace Filtering**:
+   Custom character sequences are processed through an ordered set (`customChars.toSet()`). Duplicate characters (e.g. entering `@@@***`) are deduplicated and processed safely without recursive replacement or speech duplication. Whitespace characters are ignored.
+5. **Safe Empty String Fallback**:
+   When the custom string is empty or contains only whitespace, Custom mode acts safely as prosodic punctuation: no symbols are spoken aloud, while natural phrasing and intonation pauses are fully preserved.
+6. **TalkBack Accessibility**:
+   The `PunctuationLevelDialog` treats each radio button and its label as a single accessible control (`Role.RadioButton` with merged descendants). When "Custom" is selected, an `OutlinedTextField` appears directly below the Custom radio option with an accessible label and `contentDescription`. Focus is automatically transferred to the input field upon selection. The dialog provides accessible **OK** (confirm) and **Cancel** (dismiss) actions.
+7. **State Persistence & Defaults**:
+   The custom punctuation string is stored in SharedPreferences under key `custom_punctuation` (default: `""`). Switching between punctuation levels retains the user's custom string in memory and storage, and invoking **Reset all settings** restores `custom_punctuation` to `""`.
+

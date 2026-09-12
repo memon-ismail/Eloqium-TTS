@@ -9,6 +9,7 @@
 </p>
 
 <p align="center">
+  <img src="https://img.shields.io/badge/Version-0.1.1-blue.svg" alt="Version 0.1.1" />
   <img src="https://img.shields.io/badge/License-Apache_2.0-blue.svg" alt="Apache 2.0 License" />
   <img src="https://img.shields.io/badge/Platform-Android_8.0%2B-green.svg" alt="Android 8.0+" />
   <img src="https://img.shields.io/badge/Architecture-ARM64%20%7C%20ARMv7%20%7C%20x86__64-orange.svg" alt="Architecture" />
@@ -41,9 +42,9 @@
 ---
 
 ## About
-
-Eloqium TTS is an independent open-source text-to-speech engine designed for Android screen-reader users and everyday speech output. It provides fast, clear, and highly responsive speech synthesis that works completely offline on your device.
-
+ 
+Eloqium TTS (version 0.1.1) is an independent open-source text-to-speech engine designed for Android screen-reader users and everyday speech output. It provides fast, clear, and highly responsive speech synthesis that works completely offline on your device.
+ 
 The project was created and is maintained by **Ismail Memon**.
 
 ### Special Thanks To
@@ -63,7 +64,7 @@ Eloqium pairs an optimized native build of OpenEVV with modern Android accessibi
 - **Speech Rate Control**: Granular relative rate adjustment (-10 to +10) with an optional high-speed mode for advanced screen-reader users.
 - **Pitch and Tone Shaping**: Adjust pitch, inflection, head size, roughness, and breathiness to customize voice personality.
 - **Digital Volume Boost**: Clean PCM audio amplification with built-in clipping protection for noisy environments.
-- **Punctuation Controls**: Four selectable punctuation verbosity levels (None, Some, Most, All) matching screen-reader preferences.
+- **Punctuation Controls**: Five selectable punctuation verbosity levels (None, Some, Most, All, Custom) matching screen-reader preferences and user-defined symbol speech.
 - **Intonation and Pause Controls**: Natural clause boundaries and customizable pause cadences.
 - **Emoji and Emoticon Speech**: Full spoken descriptions for over 3,800 Unicode emojis and common text emoticons.
 - **Number and Abbreviation Processing**: Context-aware expansion for common abbreviations and numbers without unexpected spelling pauses.
@@ -127,7 +128,12 @@ The **Eloqium settings** screen allows you to fine-tune speech parameters:
 - **Pitch**: Raise or lower the base voice pitch.
 - **Volume**: Adjust digital output gain.
 - **Voice Characteristics**: Fine-tune inflection, head size, roughness, and breathiness.
-- **Punctuation Level**: Select None, Some, Most, or All.
+- **Punctuation Level**: Select None, Some, Most, All, or Custom:
+  - **None**: Pure prosodic phrasing without spoken symbols.
+  - **Some**: Verbalizes mathematical and syntax symbols (`*`, `/`, `\`, `#`, `%`, `&`, `+`, `=`, `@`, `^`, `~`, `<`, `>`, `|`, `$`).
+  - **Most**: Some + structural delimiters (parentheses, brackets, braces, quotes, dashes, colons, semicolons).
+  - **All**: All punctuation marks including sentence terminators (periods, commas, question marks, exclamation marks).
+  - **Custom**: Verbalizes only user-specified characters entered in the custom punctuation field; all other marks remain prosodic.
 - **Emoji and Emoticons**: Toggle spoken announcements for emojis and text smiles.
 - **Number Processing**: Choose between natural numbers and individual digit reading.
 - **Abbreviations**: Enable or disable context-sensitive abbreviation expansion.

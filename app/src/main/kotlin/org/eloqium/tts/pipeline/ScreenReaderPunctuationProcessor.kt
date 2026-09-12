@@ -68,15 +68,50 @@ object ScreenReaderPunctuationProcessor {
         '!' to " exclamation mark "
     )
 
+    // Extended symbols for custom mode recognition
+    private val EXTENDED_SYMBOLS = mapOf(
+        '€' to " euro ",
+        '£' to " pound ",
+        '¥' to " yen ",
+        '¢' to " cent ",
+        '₹' to " rupee ",
+        '§' to " section ",
+        '°' to " degree ",
+        '±' to " plus minus ",
+        '÷' to " divided by ",
+        '×' to " times ",
+        '¿' to " inverted question mark ",
+        '¡' to " inverted exclamation mark ",
+        '©' to " copyright ",
+        '®' to " registered ",
+        '™' to " trademark ",
+        '•' to " bullet ",
+        '`' to " grave accent "
+    )
+
+    private val MASTER_PUNCT_MAP = SOME_MAP + MOST_ADDITIONS + ALL_ADDITIONS + EXTENDED_SYMBOLS
+
+    fun buildCustomMap(customChars: String): Map<Char, String> {
+        if (customChars.isEmpty()) return emptyMap()
+        val result = mutableMapOf<Char, String>()
+        for (c in customChars.toSet()) {
+            if (c.isWhitespace()) continue
+            val spoken = MASTER_PUNCT_MAP[c] ?: " $c "
+            result[c] = spoken
+        }
+        return result
+    }
+
     fun process(
         text: String,
         enabled: Boolean = false,
-        level: Int = SettingsDefaults.PUNCT_NONE
+        level: Int = SettingsDefaults.PUNCT_NONE,
+        customPunctuation: String = ""
     ): String {
         if (text.isEmpty()) return text
         if (!enabled || level == SettingsDefaults.PUNCT_NONE) {
             // Prosodic punctuation mode
-            var out = SPACE_BEFORE_PUNCT.replace(text, "$1$2")
+            val out = SPACE_BEFORE_PUNCT.replace(text, "$1$2")
             return MULTI_SPACE.replace(out, " ").trim()
         }
 
@@ -85,21 +120,24 @@ object ScreenReaderPunctuationProcessor {
             SettingsDefaults.PUNCT_SOME -> SOME_MAP
             SettingsDefaults.PUNCT_MOST -> SOME_MAP + MOST_ADDITIONS
             SettingsDefaults.PUNCT_ALL -> SOME_MAP + MOST_ADDITIONS + ALL_ADDITIONS
+            SettingsDefaults.PUNCT_CUSTOM -> buildCustomMap(customPunctuation)
             else -> emptyMap()
         }
 
         if (activeMap.isEmpty()) {
-            return text
+            val out = SPACE_BEFORE_PUNCT.replace(text, "$1$2")
+            return MULTI_SPACE.replace(out, " ").trim()
         }
 
         // Tokenize while protecting numeric patterns
-        val sb = StringBuilder(text.length * 2)
+        val boundText = SPACE_BEFORE_PUNCT.replace(text, "$1$2")
+        val sb = StringBuilder(boundText.length * 2)
         var i = 0
-        val len = text.length
+        val len = boundText.length
 
         while (i < len) {
             // Check if current position matches a decimal or thousands or time
-            val sub = text.substring(i)
+            val sub = boundText.substring(i)
             val decMatch = DECIMAL_REGEX.find(sub)
             if (decMatch != null && decMatch.range.first == 0) {
                 // If level is ALL, even dot/comma in numbers might need reading or keep natural
@@ -130,7 +168,7 @@ object ScreenReaderPunctuationProcessor {
 
             val timeMatch = TIME_REGEX.find(sub)
             if (timeMatch != null && timeMatch.range.first == 0) {
-                if (level >= SettingsDefaults.PUNCT_MOST) {
+                if (level == SettingsDefaults.PUNCT_MOST || level == SettingsDefaults.PUNCT_ALL) {
                     val timeStr = timeMatch.value
                     val transformed = timeStr.replace(":", " colon ")
                     sb.append(transformed)
@@ -141,7 +179,7 @@ object ScreenReaderPunctuationProcessor {
                 continue
             }
 
-            val c = text[i]
+            val c = boundText[i]
             val spoken = activeMap[c]
             if (spoken != null) {
                 sb.append(spoken)

@@ -372,7 +372,8 @@ class EloqiumTtsService : TextToSpeechService() {
             val punctuated = ScreenReaderPunctuationProcessor.process(
                 normalized,
                 enabled = settings.processPunctuation,
-                level = settings.punctuationLevel
+                level = settings.punctuationLevel,
+                customPunctuation = settings.customPunctuation
             )
 
             // Pipeline step 7: OpenEVV fixes & Chunking

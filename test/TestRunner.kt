@@ -469,6 +469,7 @@ fun main() {
     assert(settings.enableEmoji == SettingsDefaults.DEFAULT_EMOJI_EMOTICON, "Default enableEmoji is true")
     assert(settings.processPunctuation == SettingsDefaults.DEFAULT_PROCESS_PUNCTUATION, "Default processPunctuation is false")
     assert(settings.punctuationLevel == SettingsDefaults.DEFAULT_PUNCTUATION_LEVEL, "Default punctuationLevel is 0 (None)")
+    assert(settings.customPunctuation == SettingsDefaults.DEFAULT_CUSTOM_PUNCTUATION, "Default customPunctuation is empty")
     assert(settings.useNumberProcessing == SettingsDefaults.DEFAULT_USE_NUMBER_PROCESSING, "Default useNumberProcessing is false")
     assert(settings.numberProcessingMode == SettingsDefaults.DEFAULT_NUMBER_PROCESSING_MODE, "Default numberProcessingMode is 0 (Digits)")
     assert(settings.useAbbreviations == SettingsDefaults.DEFAULT_USE_ABBREVIATIONS, "Default useAbbreviations is true")
@@ -492,7 +493,8 @@ fun main() {
     settings.breathiness = 2
     settings.enableEmoji = false
     settings.processPunctuation = true
-    settings.punctuationLevel = 2
+    settings.punctuationLevel = 4
+    settings.customPunctuation = "@#%*"
     settings.useNumberProcessing = true
     settings.numberProcessingMode = 1
     settings.useAbbreviations = false
@@ -515,7 +517,8 @@ fun main() {
     assert(settings.breathiness == 2 && mockPrefs.map[SettingsDefaults.KEY_BREATHINESS] == 2, "Mutated breathiness persisted")
     assert(!settings.enableEmoji && mockPrefs.map[SettingsDefaults.KEY_EMOJI_EMOTICON] == false, "Mutated enableEmoji persisted")
     assert(settings.processPunctuation && mockPrefs.map[SettingsDefaults.KEY_PROCESS_PUNCTUATION] == true, "Mutated processPunctuation persisted")
-    assert(settings.punctuationLevel == 2 && mockPrefs.map[SettingsDefaults.KEY_PUNCTUATION_LEVEL] == 2, "Mutated punctuationLevel persisted")
+    assert(settings.punctuationLevel == 4 && mockPrefs.map[SettingsDefaults.KEY_PUNCTUATION_LEVEL] == 4, "Mutated punctuationLevel persisted")
+    assert(settings.customPunctuation == "@#%*" && mockPrefs.map[SettingsDefaults.KEY_CUSTOM_PUNCTUATION] == "@#%*", "Mutated customPunctuation persisted")
     assert(settings.useNumberProcessing && mockPrefs.map[SettingsDefaults.KEY_USE_NUMBER_PROCESSING] == true, "Mutated useNumberProcessing persisted")
     assert(settings.numberProcessingMode == 1 && mockPrefs.map[SettingsDefaults.KEY_NUMBER_PROCESSING_MODE] == 1, "Mutated numberProcessingMode persisted")
     assert(!settings.useAbbreviations && mockPrefs.map[SettingsDefaults.KEY_USE_ABBREVIATIONS] == false, "Mutated useAbbreviations persisted")
@@ -523,6 +526,11 @@ fun main() {
     assert(settings.forceLanguage && mockPrefs.map[SettingsDefaults.KEY_FORCE_LANGUAGE] == true, "Mutated forceLanguage persisted")
     assert(settings.language == "es-ES" && mockPrefs.map[SettingsDefaults.KEY_LANGUAGE] == "es-ES", "Mutated language persisted")
     assert(settings.samplingRate == 16000 && mockPrefs.map[SettingsDefaults.KEY_SAMPLING_RATE] == 16000, "Mutated samplingRate persisted")
+
+    // Verify persistence across reload in new Settings instance
+    val reloadedSettings = Settings(mockPrefs)
+    assert(reloadedSettings.punctuationLevel == 4, "Reloaded settings has punctuationLevel 4")
+    assert(reloadedSettings.customPunctuation == "@#%*", "Reloaded settings has customPunctuation @#%*")
 
     // 15.3 Reset All Settings
     settings.resetAll()
@@ -541,6 +549,7 @@ fun main() {
     assert(settings.enableEmoji == SettingsDefaults.DEFAULT_EMOJI_EMOTICON, "resetAll restored enableEmoji")
     assert(settings.processPunctuation == SettingsDefaults.DEFAULT_PROCESS_PUNCTUATION, "resetAll restored processPunctuation")
     assert(settings.punctuationLevel == SettingsDefaults.DEFAULT_PUNCTUATION_LEVEL, "resetAll restored punctuationLevel")
+    assert(settings.customPunctuation == SettingsDefaults.DEFAULT_CUSTOM_PUNCTUATION, "resetAll restored customPunctuation")
     assert(settings.useNumberProcessing == SettingsDefaults.DEFAULT_USE_NUMBER_PROCESSING, "resetAll restored useNumberProcessing")
     assert(settings.numberProcessingMode == SettingsDefaults.DEFAULT_NUMBER_PROCESSING_MODE, "resetAll restored numberProcessingMode")
     assert(settings.useAbbreviations == SettingsDefaults.DEFAULT_USE_ABBREVIATIONS, "resetAll restored useAbbreviations")
@@ -777,10 +786,49 @@ fun main() {
            pAll.contains("question mark") && pAll.contains("dot"),
         "Level All verbalizes all punctuation: ")
 
-    // Protected patterns
-    val pProtected = ScreenReaderPunctuationProcessor.process("Values 3.14, 1,000 at 12:30.", enabled = true, level = SettingsDefaults.PUNCT_SOME)
-    assert(pProtected.contains("3.14") && pProtected.contains("1,000") && pProtected.contains("12:30"),
-        "Numbers and times protected in Level Some: ")
+    // Level Custom: single symbol
+    val pCustomSingle = ScreenReaderPunctuationProcessor.process("Contact @user or check #tag and 50% off.", enabled = true, level = SettingsDefaults.PUNCT_CUSTOM, customPunctuation = "@")
+    assert(pCustomSingle.contains("at") && !pCustomSingle.contains("number") && !pCustomSingle.contains("percent"),
+        "Custom single symbol verbalizes only '@': $pCustomSingle")
+
+    // Level Custom: multiple symbols
+    val pCustomMulti = ScreenReaderPunctuationProcessor.process("Item @user #tag 50% * 2 = 100", enabled = true, level = SettingsDefaults.PUNCT_CUSTOM, customPunctuation = "@#*")
+    assert(pCustomMulti.contains("at") && pCustomMulti.contains("number") && pCustomMulti.contains("star") && !pCustomMulti.contains("percent") && !pCustomMulti.contains("equals"),
+        "Custom multiple symbols verbalizes only '@', '#', '*': $pCustomMulti")
+
+    // Level Custom: empty string
+    val pCustomEmpty = ScreenReaderPunctuationProcessor.process("Hello, world! Is it true? Yes.", enabled = true, level = SettingsDefaults.PUNCT_CUSTOM, customPunctuation = "")
+    assert(!pCustomEmpty.contains("comma") && !pCustomEmpty.contains("question mark") && !pCustomEmpty.contains("dot") && !pCustomEmpty.contains("exclamation mark"),
+        "Custom empty string verbalizes no punctuation: $pCustomEmpty")
+    assert(pCustomEmpty.contains("?"), "Custom empty string preserves prosodic question mark: $pCustomEmpty")
+
+    // Level Custom: duplicate characters
+    val pCustomDups = ScreenReaderPunctuationProcessor.process("Check @here and *now*", enabled = true, level = SettingsDefaults.PUNCT_CUSTOM, customPunctuation = "@@@@****")
+    assert(pCustomDups.contains("at") && pCustomDups.contains("star"), "Custom duplicate characters handled safely: $pCustomDups")
+    assert(!pCustomDups.contains("at at") && !pCustomDups.contains("star star star"), "Custom duplicates do not cause duplicate verbalizations: $pCustomDups")
+
+    // Level Custom: switching between modes
+    val switchInput = "Alert: @user at 10%!"
+    val resNone = ScreenReaderPunctuationProcessor.process(switchInput, enabled = true, level = SettingsDefaults.PUNCT_NONE)
+    val resSome = ScreenReaderPunctuationProcessor.process(switchInput, enabled = true, level = SettingsDefaults.PUNCT_SOME)
+    val resMost = ScreenReaderPunctuationProcessor.process(switchInput, enabled = true, level = SettingsDefaults.PUNCT_MOST)
+    val resAll = ScreenReaderPunctuationProcessor.process(switchInput, enabled = true, level = SettingsDefaults.PUNCT_ALL)
+    val resCustom = ScreenReaderPunctuationProcessor.process(switchInput, enabled = true, level = SettingsDefaults.PUNCT_CUSTOM, customPunctuation = "@")
+    assert(!resNone.contains("at user"), "Mode switching None: $resNone")
+    assert(resSome.contains("at user") && resSome.contains("percent") && !resSome.contains("colon"), "Mode switching Some: $resSome")
+    assert(resMost.contains("colon") && resMost.contains("percent"), "Mode switching Most: $resMost")
+    assert(resAll.contains("exclamation mark"), "Mode switching All: $resAll")
+    assert(resCustom.contains("at user") && !resCustom.contains("percent") && !resCustom.contains("colon") && !resCustom.contains("exclamation mark"), "Mode switching Custom: $resCustom")
+
+    // Protected patterns in Custom and other levels
+    val pProtectedSome = ScreenReaderPunctuationProcessor.process("Values 3.14, 1,000 at 12:30.", enabled = true, level = SettingsDefaults.PUNCT_SOME)
+    assert(pProtectedSome.contains("3.14") && pProtectedSome.contains("1,000") && pProtectedSome.contains("12:30"),
+        "Numbers and times protected in Level Some: $pProtectedSome")
+
+    val pProtectedCustom = ScreenReaderPunctuationProcessor.process("Values 3.14, 1,000 at 12:30. Is it valid? Yes.", enabled = true, level = SettingsDefaults.PUNCT_CUSTOM, customPunctuation = "@#")
+    assert(pProtectedCustom.contains("3.14") && pProtectedCustom.contains("1,000") && pProtectedCustom.contains("12:30"),
+        "Numbers and times protected in Level Custom: $pProtectedCustom")
+    assert(pProtectedCustom.contains("?"), "Question intonation mark preserved in Level Custom: $pProtectedCustom")
 
     // Repeated punctuation
     val pRepeated = ScreenReaderPunctuationProcessor.process("Wait...", enabled = true, level = SettingsDefaults.PUNCT_ALL)
@@ -937,12 +985,14 @@ fun main() {
         1 -> "Some"
         2 -> "Most"
         3 -> "All"
+        4 -> "Custom"
         else -> "None"
     }
     assert(punctLevelLabel(SettingsDefaults.PUNCT_NONE) == "None", "Punct level 0 is None")
     assert(punctLevelLabel(SettingsDefaults.PUNCT_SOME) == "Some", "Punct level 1 is Some")
     assert(punctLevelLabel(SettingsDefaults.PUNCT_MOST) == "Most", "Punct level 2 is Most")
     assert(punctLevelLabel(SettingsDefaults.PUNCT_ALL) == "All", "Punct level 3 is All")
+    assert(punctLevelLabel(SettingsDefaults.PUNCT_CUSTOM) == "Custom", "Punct level 4 is Custom")
 
     // --- Suite 27: System TTS Lifecycle, Regex Safety & Thread-Safe Engine ---
     println("\n--- Suite 27: System TTS Lifecycle, Regex Safety & Thread-Safe Engine ---")
