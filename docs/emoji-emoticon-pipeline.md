@@ -4,7 +4,7 @@
 
 Eloqium TTS provides fully offline, multilingual speech vocalization for Unicode 16.0 emojis and conservative ASCII emoticons across all 5 supported language families:
 - English (`en` / `en-US`, `en-GB`)
-- Spanish (`es` / `es-ES`, `es-US`)
+- Spanish (`es` / `es-ES`, `es-MX`)
 - French (`fr` / `fr-FR`, `fr-CA`)
 - German (`de` / `de-DE`)
 - Italian (`it` / `it-IT`)
@@ -21,25 +21,34 @@ The execution order within `org.eloqium.tts.service.EloqiumTtsService` is strict
 [SynthesisRequest.charSequenceText]
              │
              ▼
-    [EmojiProcessor]         <-- UTF-16 Trie greedy longest-match lookup from assets/emoji_data.bin
+ [UserDictionaryProcessor]   <-- Language-scoped word/phrase replacements (precedence over abbreviations)
+             │
+             ▼
+  [AbbreviationProcessor]    <-- Grammar and context-aware abbreviation expansion
+             │
+             ▼
+     [EmojiProcessor]        <-- UTF-16 Trie greedy longest-match lookup from assets/emoji_data.bin
              │
              ▼
    [EmoticonProcessor]       <-- Conservative ASCII emoticons with protected spans (URLs, code, math, times)
              │
              ▼
+    [NumberProcessor]        <-- Natural numbers vs. digit reading modes
+             │
+             ▼
    [UnicodeNormalizer]       <-- Normalizes typographic quotes, dashes, symbols to Latin-1
              │
              ▼
- [ScreenReaderPunctuation]   <-- Handles verbalization / punctuation re-binding
+ [ScreenReaderPunctuation]   <-- Handles verbosity filtering: None, Some, Most, All, Custom
              │
              ▼
 [OpenEVVCompatibilityFixes]  <-- Separates digit/letter boundaries, sanitizes rogue backticks
              │
              ▼
-     [PauseProcessor]        <-- Phrase prediction (`pp1), question pitch inflection, pause rules
+        [Chunker]            <-- Splits large paragraphs at natural clause boundaries
              │
              ▼
-        [Chunker]            <-- Splits large paragraphs at natural clause boundaries
+     [PauseProcessor]        <-- Phrase prediction (`pp1), question pitch inflection, pause rules
              │
              ▼
      [OpenEVVEncoder]        <-- Encodes clean Latin-1 bytes for libevv

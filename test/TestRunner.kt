@@ -30,6 +30,13 @@ import org.eloqium.tts.pipeline.ScreenReaderPunctuationProcessor
 import org.eloqium.tts.pipeline.TextRequest
 import org.eloqium.tts.pipeline.UnicodeNormalizer
 import android.speech.tts.TextToSpeech
+import org.eloqium.tts.service.MatchMode
+import org.eloqium.tts.service.UserDictionary
+import org.eloqium.tts.service.UserDictionaryEntry
+import org.eloqium.tts.service.UserDictionaryJson
+import org.eloqium.tts.service.UserDictionaryRepository
+import org.eloqium.tts.service.UserDictionarySystem
+import org.eloqium.tts.pipeline.UserDictionaryProcessor
 import java.io.File
 import java.util.Locale
 
@@ -1177,7 +1184,489 @@ fun main() {
     }
     assert(serviceDestroyPassed, "EloqiumTtsService.onDestroy completes cleanly and releases native engine")
 
-    println("\n==================================================")
+    // =========================================================================
+    // --- Suite 29: User Dictionary JSON Engine, Schema Validation & Serialization ---
+    // =========================================================================
+    println("\n--- Suite 29: User Dictionary JSON Engine, Schema Validation & Serialization ---")
+
+    val sampleDict = UserDictionary(
+        name = "Technical Terms",
+        enabled = true,
+        entries = listOf(
+            UserDictionaryEntry(source = "Eloqium", replacement = "Ee-loh-kee-um", matchMode = MatchMode.EXACT, caseSensitive = false),
+            UserDictionaryEntry(source = "NASA", replacement = "N A S A", matchMode = MatchMode.EXACT, caseSensitive = true),
+            UserDictionaryEntry(source = "micro", replacement = "small ", matchMode = MatchMode.STARTS_WITH, caseSensitive = false),
+            UserDictionaryEntry(source = "burgh", replacement = "burg", matchMode = MatchMode.ENDS_WITH, caseSensitive = false),
+            UserDictionaryEntry(source = ":=", replacement = "assigned to", matchMode = MatchMode.CONTAINS, caseSensitive = false)
+        )
+    )
+
+    val exportedJson = UserDictionaryJson.exportDictionary(sampleDict, "en-US")
+    assert(exportedJson.contains("\"schemaVersion\": 1"), "Exported JSON contains schemaVersion 1")
+    assert(exportedJson.contains("\"language\": \"en-US\""), "Exported JSON contains correct language tag")
+    assert(exportedJson.contains("\"name\": \"Technical Terms\""), "Exported JSON contains dictionary name")
+    assert(exportedJson.contains("\"source\": \"Eloqium\""), "Exported JSON contains entry source")
+    assert(exportedJson.contains("\"matchMode\": \"Starts with\""), "Exported JSON serializes matchMode display name")
+
+    val parsedResult = UserDictionaryJson.parseDictionary(exportedJson)
+    assert(parsedResult.isSuccess, "parseDictionary succeeds on valid exported JSON")
+    val parsed = parsedResult.getOrThrow()
+    assert(parsed.schemaVersion == 1, "Parsed schemaVersion is 1")
+    assert(parsed.languageTag == "en-US", "Parsed language is en-US")
+    assert(parsed.dictionary.name == "Technical Terms", "Parsed dictionary name matches")
+    assert(parsed.dictionary.enabled, "Parsed dictionary enabled state matches")
+    assert(parsed.dictionary.entries.size == 5, "Parsed dictionary contains all 5 entries")
+    assert(parsed.dictionary.entries[1].source == "NASA" && parsed.dictionary.entries[1].caseSensitive, "Parsed entry preserves case sensitivity")
+    assert(parsed.dictionary.entries[2].matchMode == MatchMode.STARTS_WITH, "Parsed entry preserves Starts with match mode")
+
+    // Error handling: Malformed JSON
+    val malformedResult = UserDictionaryJson.parseDictionary("not a json string {")
+    assert(malformedResult.isFailure, "parseDictionary fails gracefully on malformed JSON")
+
+    // Error handling: Missing schemaVersion
+    val noVersionResult = UserDictionaryJson.parseDictionary("{\"language\": \"en-US\", \"name\": \"Test\"}")
+    assert(noVersionResult.isFailure, "parseDictionary fails on missing schemaVersion")
+
+    // Error handling: Unsupported schema version
+    val badVersionResult = UserDictionaryJson.parseDictionary("{\"schemaVersion\": 99, \"language\": \"en-US\", \"name\": \"Test\"}")
+    assert(badVersionResult.isFailure && badVersionResult.exceptionOrNull()?.message?.contains("Unsupported schema version: 99") == true,
+        "parseDictionary rejects unsupported schema version 99 with descriptive message")
+
+    // Error handling: Missing language
+    val noLangResult = UserDictionaryJson.parseDictionary("{\"schemaVersion\": 1, \"name\": \"Test\"}")
+    assert(noLangResult.isFailure && noLangResult.exceptionOrNull()?.message?.contains("Missing required field: language") == true,
+        "parseDictionary rejects missing language")
+
+    // Empty dictionary export and import
+    val emptyDict = UserDictionary(name = "Empty Dict", enabled = false, entries = emptyList())
+    val emptyJson = UserDictionaryJson.exportDictionary(emptyDict, "es-ES")
+    val parsedEmpty = UserDictionaryJson.parseDictionary(emptyJson).getOrThrow()
+    assert(parsedEmpty.dictionary.entries.isEmpty() && !parsedEmpty.dictionary.enabled, "Empty dictionary export/import round-trips cleanly")
+
+    // System-level export and import
+    val sampleSystem = UserDictionarySystem(
+        schemaVersion = 1,
+        languages = listOf(
+            org.eloqium.tts.service.LanguageDictionaries("en-US", listOf(sampleDict)),
+            org.eloqium.tts.service.LanguageDictionaries("es-ES", listOf(emptyDict))
+        )
+    )
+    val sysJson = UserDictionaryJson.exportSystem(sampleSystem)
+    val parsedSys = UserDictionaryJson.parseSystem(sysJson)
+    assert(parsedSys.languages.size == 2, "parseSystem round-trips all languages")
+    assert(parsedSys.languages[0].languageTag == "en-US" && parsedSys.languages[0].dictionaries[0].entries.size == 5, "parseSystem round-trips nested dictionaries")
+
+    // =========================================================================
+    // --- Suite 30: User Dictionary System & Repository Lifecycle ---
+    // =========================================================================
+    println("\n--- Suite 30: User Dictionary System & Repository Lifecycle ---")
+
+    val dictMockPrefs = MockSharedPreferences()
+    val repo = UserDictionaryRepository(dictMockPrefs)
+
+    // 30.1 Initial state: no languages
+    assert(repo.getAddedLanguages().isEmpty(), "Initial repository has zero added languages")
+    assert(!repo.isLanguageAdded("en-US"), "isLanguageAdded returns false for en-US initially")
+
+    // 30.2 Add Language creates User Dictionary automatically
+    val enLang = repo.addLanguage("en-US")
+    assert(repo.isLanguageAdded("en-US"), "isLanguageAdded returns true after adding en-US")
+    assert(repo.getAddedLanguages().size == 1, "Added languages size is 1")
+    assert(enLang.dictionaries.size == 1, "Adding a language automatically creates exactly one dictionary")
+    val defaultDict = enLang.dictionaries[0]
+    assert(defaultDict.name == "User Dictionary", "Automatically-created dictionary is named 'User Dictionary'")
+    assert(defaultDict.enabled, "Automatically-created dictionary is enabled by default")
+    assert(defaultDict.entries.isEmpty(), "Automatically-created dictionary starts with zero entries")
+
+    // 30.3 Add second dictionary
+    val customDict = repo.addDictionary("en-US", "Names")
+    assert(repo.getDictionaries("en-US").size == 2, "en-US now contains 2 dictionaries")
+    assert(customDict.name == "Names" && customDict.enabled, "New dictionary 'Names' created enabled with zero entries")
+
+    // 30.4 Rename dictionary
+    val renamedSuccess = repo.renameDictionary("en-US", customDict.id, "Proper Names")
+    assert(renamedSuccess, "renameDictionary returns true")
+    assert(repo.getDictionary("en-US", customDict.id)?.name == "Proper Names", "Dictionary name updated to 'Proper Names'")
+
+    // 30.5 Disable and Re-enable dictionary
+    repo.setDictionaryEnabled("en-US", customDict.id, false)
+    assert(repo.getDictionary("en-US", customDict.id)?.enabled == false, "Dictionary can be disabled")
+    repo.setDictionaryEnabled("en-US", customDict.id, true)
+    assert(repo.getDictionary("en-US", customDict.id)?.enabled == true, "Dictionary can be re-enabled")
+
+    // 30.6 Entry CRUD
+    val entry1 = UserDictionaryEntry(source = "Eloqium", replacement = "Ee-loh-kee-um", matchMode = MatchMode.EXACT, caseSensitive = false)
+    val entry2 = UserDictionaryEntry(source = "NASA", replacement = "N A S A", matchMode = MatchMode.EXACT, caseSensitive = true)
+    repo.addEntry("en-US", defaultDict.id, entry1)
+    repo.addEntry("en-US", defaultDict.id, entry2)
+    assert(repo.getEntries("en-US", defaultDict.id).size == 2, "Added 2 entries to User Dictionary")
+
+    // Rejects empty source
+    val invalidEntryResult = repo.addEntry("en-US", defaultDict.id, UserDictionaryEntry(source = "   ", replacement = "x"))
+    assert(!invalidEntryResult, "Repository rejects entry with blank source")
+
+    // Update entry
+    val updatedEntry1 = entry1.copy(replacement = "Ee loh kwee um")
+    repo.updateEntry("en-US", defaultDict.id, updatedEntry1)
+    assert(repo.getEntries("en-US", defaultDict.id).first { it.id == entry1.id }.replacement == "Ee loh kwee um", "Entry replacement updated")
+
+    // Delete entry
+    repo.deleteEntry("en-US", defaultDict.id, entry2.id)
+    assert(repo.getEntries("en-US", defaultDict.id).size == 1, "Entry deleted successfully")
+
+    // 30.7 Persistence across repository reload
+    val reloadedRepo = UserDictionaryRepository(dictMockPrefs)
+    assert(reloadedRepo.getAddedLanguages().size == 1, "Reloaded repository retains 1 added language")
+    assert(reloadedRepo.getDictionaries("en-US").size == 2, "Reloaded repository retains 2 dictionaries")
+    assert(reloadedRepo.getEntries("en-US", defaultDict.id).first().replacement == "Ee loh kwee um", "Reloaded repository retains entries")
+
+    // 30.8 Duplicate dictionary name handling on import
+    val importRes1 = reloadedRepo.importDictionary("en-US", UserDictionaryJson.exportDictionary(defaultDict, "en-US"))
+    assert(importRes1.isSuccess, "Import dictionary succeeds")
+    assert(importRes1.getOrThrow().dictionary.name == "User Dictionary (1)", "Duplicate dictionary name handled by appending ' (1)'")
+
+    // 30.9 Final-dictionary deletion behavior
+    // Currently en-US has 3 dictionaries: "User Dictionary", "Proper Names", "User Dictionary (1)"
+    val allDicts = reloadedRepo.getDictionaries("en-US")
+    reloadedRepo.deleteDictionary("en-US", allDicts[0].id)
+    reloadedRepo.deleteDictionary("en-US", allDicts[1].id)
+    assert(reloadedRepo.isLanguageAdded("en-US"), "Language remains added while 1 dictionary still exists")
+    reloadedRepo.deleteDictionary("en-US", allDicts[2].id)
+    assert(!reloadedRepo.isLanguageAdded("en-US"), "Language disappears from added languages after final dictionary is deleted")
+    assert(reloadedRepo.getAddedLanguages().isEmpty(), "No added languages remaining after final dictionary deleted")
+
+    // =========================================================================
+    // --- Suite 31: User Dictionary Matching Engine & Precedence ---
+    // =========================================================================
+    println("\n--- Suite 31: User Dictionary Matching Engine & Precedence ---")
+
+    // 31.1 Exact match mode
+    assert(UserDictionaryProcessor.matchesTarget("NASA", "NASA", MatchMode.EXACT, true), "Exact match target: equal")
+    assert(!UserDictionaryProcessor.matchesTarget("NASA", "NASAL", MatchMode.EXACT, true), "Exact match target: not equal to prefix")
+    val exactRules = UserDictionaryProcessor.compileEntries(listOf(
+        UserDictionaryEntry(source = "NASA", replacement = "N A S A", matchMode = MatchMode.EXACT, caseSensitive = true),
+        UserDictionaryEntry(source = ":=", replacement = "assigned to", matchMode = MatchMode.EXACT, caseSensitive = false)
+    ))
+    assert(UserDictionaryProcessor.process("The NASA space probe", exactRules) == "The N A S A space probe", "Exact match replaces standalone word")
+    assert(UserDictionaryProcessor.process("The NASAL cavity", exactRules) == "The NASAL cavity", "Exact match protects words with same prefix")
+    assert(UserDictionaryProcessor.process("variable := 42", exactRules) == "variable assigned to 42", "Exact match replaces symbol expression")
+
+    // 31.2 Starts with match mode
+    assert(UserDictionaryProcessor.matchesTarget("micro", "microscope", MatchMode.STARTS_WITH, false), "Starts with target: prefix match")
+    assert(!UserDictionaryProcessor.matchesTarget("scope", "microscope", MatchMode.STARTS_WITH, false), "Starts with target: suffix does not match")
+    val startsWithRules = UserDictionaryProcessor.compileEntries(listOf(
+        UserDictionaryEntry(source = "micro", replacement = "small ", matchMode = MatchMode.STARTS_WITH, caseSensitive = false)
+    ))
+    assert(UserDictionaryProcessor.process("Look at the microscope", startsWithRules) == "Look at the small scope", "Starts with replaces prefix")
+    assert(UserDictionaryProcessor.process("antimicrobial", startsWithRules) == "antimicrobial", "Starts with does not match middle of word")
+
+    // 31.3 Ends with match mode
+    assert(UserDictionaryProcessor.matchesTarget("burgh", "Pittsburgh", MatchMode.ENDS_WITH, false), "Ends with target: suffix match")
+    val endsWithRules = UserDictionaryProcessor.compileEntries(listOf(
+        UserDictionaryEntry(source = "burgh", replacement = "burg", matchMode = MatchMode.ENDS_WITH, caseSensitive = false)
+    ))
+    assert(UserDictionaryProcessor.process("Welcome to Pittsburgh today", endsWithRules) == "Welcome to Pittsburg today", "Ends with replaces suffix")
+    assert(UserDictionaryProcessor.process("burgher", endsWithRules) == "burgher", "Ends with does not match prefix")
+
+    // 31.4 Contains match mode
+    assert(UserDictionaryProcessor.matchesTarget("cat", "scatty", MatchMode.CONTAINS, false), "Contains target: substring match")
+    val containsRules = UserDictionaryProcessor.compileEntries(listOf(
+        UserDictionaryEntry(source = "cat", replacement = "feline", matchMode = MatchMode.CONTAINS, caseSensitive = false)
+    ))
+    assert(UserDictionaryProcessor.process("scatty cat", containsRules) == "sfelinety feline", "Contains replaces arbitrary substrings")
+
+    // 31.5 Case sensitivity
+    val caseSensitiveRules = UserDictionaryProcessor.compileEntries(listOf(
+        UserDictionaryEntry(source = "Eloqium", replacement = "Ee-loh-kee-um", matchMode = MatchMode.EXACT, caseSensitive = true)
+    ))
+    assert(UserDictionaryProcessor.process("Eloqium is great", caseSensitiveRules) == "Ee-loh-kee-um is great", "Case-sensitive matches exact case")
+    assert(UserDictionaryProcessor.process("eloqium is great", caseSensitiveRules) == "eloqium is great", "Case-sensitive rejects lower-case")
+
+    val caseInsensitiveRules = UserDictionaryProcessor.compileEntries(listOf(
+        UserDictionaryEntry(source = "Eloqium", replacement = "Ee-loh-kee-um", matchMode = MatchMode.EXACT, caseSensitive = false)
+    ))
+    assert(UserDictionaryProcessor.process("eloqium ELOQIUM Eloqium", caseInsensitiveRules) == "Ee-loh-kee-um Ee-loh-kee-um Ee-loh-kee-um", "Case-insensitive matches all cases")
+
+    // 31.6 Overlapping precedence: Longer source takes priority
+    val overlapRules = UserDictionaryProcessor.compileEntries(listOf(
+        UserDictionaryEntry(source = "New", replacement = "Fresh", matchMode = MatchMode.EXACT, caseSensitive = false),
+        UserDictionaryEntry(source = "New York City", replacement = "NYC", matchMode = MatchMode.EXACT, caseSensitive = false),
+        UserDictionaryEntry(source = "New York", replacement = "NY", matchMode = MatchMode.EXACT, caseSensitive = false)
+    ))
+    assert(UserDictionaryProcessor.process("I love New York City and New York and New things.", overlapRules) == "I love NYC and NY and Fresh things.",
+        "Overlapping entries resolve with longer phrase precedence")
+
+    // 31.7 Single-pass non-cascading replacement
+    val cascadeRules = UserDictionaryProcessor.compileEntries(listOf(
+        UserDictionaryEntry(source = "cat", replacement = "caterpillar", matchMode = MatchMode.EXACT, caseSensitive = false),
+        UserDictionaryEntry(source = "pill", replacement = "tablet", matchMode = MatchMode.CONTAINS, caseSensitive = false)
+    ))
+    assert(UserDictionaryProcessor.process("The cat sat.", cascadeRules) == "The caterpillar sat.", "Single-pass replacement prevents cascading mutations")
+
+    // 31.8 Multilingual & Unicode text
+    val unicodeRules = UserDictionaryProcessor.compileEntries(listOf(
+        UserDictionaryEntry(source = "año", replacement = "year", matchMode = MatchMode.EXACT, caseSensitive = false),
+        UserDictionaryEntry(source = "München", replacement = "Munich", matchMode = MatchMode.EXACT, caseSensitive = false)
+    ))
+    assert(UserDictionaryProcessor.process("Feliz año en München!", unicodeRules) == "Feliz year en Munich!", "Unicode accented and umlaut characters match cleanly")
+
+    // =========================================================================
+    // --- Suite 32: Synthesis Pipeline Integration & Regression Testing ---
+    // =========================================================================
+    println("\n--- Suite 32: Synthesis Pipeline Integration & Regression Testing ---")
+
+    val testSettings = Settings(dictMockPrefs)
+    val testRepo = testSettings.userDictionaryRepository
+    testRepo.clearAll()
+    testRepo.addLanguage("en-US")
+    val enDefaultDict = testRepo.getDictionaries("en-US").first()
+
+    // 32.1 Precedence over built-in abbreviations
+    testRepo.addEntry("en-US", enDefaultDict.id, UserDictionaryEntry(
+        source = "Dr.",
+        replacement = "Drive",
+        matchMode = MatchMode.EXACT,
+        caseSensitive = false
+    ))
+    testSettings.userDictionaryEnabled = true
+    testSettings.useAbbreviations = true
+
+    // Step 0: User Dictionary
+    val step0Text = UserDictionaryProcessor.process("Visit Dr. Smith at 5th Ave.", "en-US", testRepo, testSettings.userDictionaryEnabled)
+    assert(step0Text.contains("Drive Smith"), "User dictionary replaces 'Dr.' with 'Drive'")
+
+    // Step 1: Built-in Abbreviations runs on output of step 0
+    val step1Text = AbbreviationProcessor.process(step0Text, testSettings.useAbbreviations)
+    assert(step1Text.contains("Drive Smith"), "User replacement 'Drive' preserved and not overwritten with Doctor")
+    assert(step1Text.contains("Avenue"), "Built-in abbreviation 'Ave.' expands normally when not in user dictionary")
+
+    // 32.2 Global switch OFF disables user dictionary without deleting entries
+    testSettings.userDictionaryEnabled = false
+    val step0Disabled = UserDictionaryProcessor.process("Visit Dr. Smith", "en-US", testRepo, testSettings.userDictionaryEnabled)
+    assert(step0Disabled == "Visit Dr. Smith", "When userDictionaryEnabled is false, text is unchanged")
+    val step1Disabled = AbbreviationProcessor.process(step0Disabled, testSettings.useAbbreviations)
+    assert(step1Disabled.contains("Doctor Smith"), "When user dictionary is disabled, built-in abbreviations expand Dr. to Doctor")
+    assert(testRepo.getEntries("en-US", enDefaultDict.id).isNotEmpty(), "Entries remain intact when global switch is off")
+
+    // Turn global switch back ON
+    testSettings.userDictionaryEnabled = true
+
+    // 32.3 Downstream Pipeline Harmony: Emoji, Numbers, and Punctuation
+    testRepo.addEntry("en-US", enDefaultDict.id, UserDictionaryEntry(
+        source = "PI",
+        replacement = "3.14",
+        matchMode = MatchMode.EXACT,
+        caseSensitive = true
+    ))
+    testRepo.addEntry("en-US", enDefaultDict.id, UserDictionaryEntry(
+        source = "goodjob",
+        replacement = "thumbs up",
+        matchMode = MatchMode.EXACT,
+        caseSensitive = false
+    ))
+
+    val mixedInput = "Value PI and goodjob: is it valid?"
+    val p0 = UserDictionaryProcessor.process(mixedInput, "en-US", testRepo, true)
+    assert(p0.contains("3.14") && p0.contains("thumbs up"), "User dictionary expands mixed source correctly")
+
+    val p1 = AbbreviationProcessor.process(p0, true)
+    val p2 = EmojiProcessor.process(p1, "en")
+    val p3Preserved = NumberProcessor.process(p2, enabled = false)
+    val p6Preserved = ScreenReaderPunctuationProcessor.process(p3Preserved, enabled = true, level = SettingsDefaults.PUNCT_SOME)
+    assert(p6Preserved.contains("3.14"), "Number decimals preserved downstream")
+    val p3Digits = NumberProcessor.process(p2, enabled = true, mode = SettingsDefaults.NUMBER_DIGITS)
+    val p6Digits = ScreenReaderPunctuationProcessor.process(p3Digits, enabled = true, level = SettingsDefaults.PUNCT_SOME)
+    assert(p6Digits.contains("3.1 4"), "Number digits formatted correctly downstream")
+    assert(p6Preserved.contains("?"), "Question intonation mark preserved downstream")
+
+    // 32.4 Live Synthesis test with User Dictionary active
+    val liveService = EloqiumTtsService()
+    val liveCallback = TestSynthesisCallback()
+    val liveReq = SynthesisRequest("Testing Eloqium user dictionary integration with PI.", Bundle())
+    liveService.onSynthesizeText(liveReq, liveCallback)
+    assert(liveCallback.started && liveCallback.finished && liveCallback.audioBytes > 0, "Live synthesis delivers audio cleanly with user dictionary active")
+    liveService.onDestroy()
+
+    // =========================================================================
+    // --- Suite 33: Real Runtime Replacement & Cache Synchronization ---
+    // =========================================================================
+    println("\n--- Suite 33: Real Runtime Replacement & Cache Synchronization ---")
+
+    // 33.1 Match modes & case-sensitivity on real text
+    val testSyncPrefs = MockSharedPreferences()
+    val testSyncRepo = UserDictionaryRepository(testSyncPrefs)
+    testSyncRepo.addLanguage("en-US")
+    val syncDict = testSyncRepo.getDictionaries("en-US").first()
+
+    // Test exact match: "hi" -> "hello", case-insensitive
+    val hiEntry = UserDictionaryEntry(source = "hi", replacement = "hello", matchMode = MatchMode.EXACT, caseSensitive = false)
+    testSyncRepo.addEntry("en-US", syncDict.id, hiEntry)
+
+    val resLower = UserDictionaryProcessor.process("hi there", "en-US", testSyncRepo, true)
+    assert(resLower == "hello there", "Exact match replaces lowercase word: 'hi' -> 'hello'")
+
+    val resUpper = UserDictionaryProcessor.process("HI there", "en-US", testSyncRepo, true)
+    assert(resUpper == "hello there", "Exact match case-insensitive replaces uppercase: 'HI' -> 'hello'")
+
+    val resWordGuard = UserDictionaryProcessor.process("which one is this", "en-US", testSyncRepo, true)
+    assert(resWordGuard == "which one is this", "Exact match does not replace substring inside word: 'which'")
+
+    // Test case-sensitive exact match
+    testSyncRepo.deleteEntry("en-US", syncDict.id, hiEntry.id)
+    val hiCaseEntry = UserDictionaryEntry(source = "hi", replacement = "hello", matchMode = MatchMode.EXACT, caseSensitive = true)
+    testSyncRepo.addEntry("en-US", syncDict.id, hiCaseEntry)
+
+    assert(UserDictionaryProcessor.process("hi there", "en-US", testSyncRepo, true) == "hello there", "Case-sensitive matches exact case: 'hi'")
+    assert(UserDictionaryProcessor.process("HI there", "en-US", testSyncRepo, true) == "HI there", "Case-sensitive rejects different case: 'HI'")
+
+    // Test Starts with
+    testSyncRepo.clearAll()
+    testSyncRepo.addLanguage("en-US")
+    val pfxDict = testSyncRepo.getDictionaries("en-US").first()
+    testSyncRepo.addEntry("en-US", pfxDict.id, UserDictionaryEntry(source = "micro", replacement = "small ", matchMode = MatchMode.STARTS_WITH, caseSensitive = false))
+    assert(UserDictionaryProcessor.process("the microscope", "en-US", testSyncRepo, true) == "the small scope", "Starts with replaces word prefix")
+    assert(UserDictionaryProcessor.process("antimicrobial", "en-US", testSyncRepo, true) == "antimicrobial", "Starts with does not match middle of word")
+
+    // Test Ends with
+    testSyncRepo.addEntry("en-US", pfxDict.id, UserDictionaryEntry(source = "burgh", replacement = "burg", matchMode = MatchMode.ENDS_WITH, caseSensitive = false))
+    assert(UserDictionaryProcessor.process("visit Pittsburgh", "en-US", testSyncRepo, true) == "visit Pittsburg", "Ends with replaces word suffix")
+    assert(UserDictionaryProcessor.process("the burgher", "en-US", testSyncRepo, true) == "the burgher", "Ends with does not match word prefix")
+
+    // Test Contains
+    testSyncRepo.addEntry("en-US", pfxDict.id, UserDictionaryEntry(source = "cat", replacement = "feline", matchMode = MatchMode.CONTAINS, caseSensitive = false))
+    assert(UserDictionaryProcessor.process("scatty cat", "en-US", testSyncRepo, true) == "sfelinety feline", "Contains replaces arbitrary substring")
+
+    // Test disabled dictionary
+    testSyncRepo.setDictionaryEnabled("en-US", pfxDict.id, false)
+    assert(UserDictionaryProcessor.process("the microscope", "en-US", testSyncRepo, true) == "the microscope", "Disabled dictionary produces unchanged text")
+    testSyncRepo.setDictionaryEnabled("en-US", pfxDict.id, true)
+    assert(UserDictionaryProcessor.process("the microscope", "en-US", testSyncRepo, true) == "the small scope", "Re-enabled dictionary applies replacements")
+
+    // Test global switch
+    assert(UserDictionaryProcessor.process("the microscope", "en-US", testSyncRepo, false) == "the microscope", "Global switch OFF produces unchanged text")
+
+    // 33.2 Cross-Instance Cache Invalidation (TTS Service vs UI)
+    val sharedPrefs = MockSharedPreferences()
+    // Simulate TTS Service starting up with its repository instance
+    val serviceRepo = UserDictionaryRepository(sharedPrefs)
+    // TTS Service runs initial query, warming its cache
+    val initialOut = UserDictionaryProcessor.process("hi there", "en-US", serviceRepo, true)
+    assert(initialOut == "hi there", "Initial TTS synthesis before UI dictionary setup produces unchanged text")
+
+    // Simulate UI running in Settings with its own separate repository instance
+    val uiRepo = UserDictionaryRepository(sharedPrefs)
+    uiRepo.addLanguage("en-US")
+    val uiDict = uiRepo.getDictionaries("en-US").first()
+    val newEntry = UserDictionaryEntry(source = "hi", replacement = "hello", matchMode = MatchMode.EXACT, caseSensitive = false)
+    uiRepo.addEntry("en-US", uiDict.id, newEntry)
+
+    // Service handles NEXT synthesis request using EXISTING serviceRepo instance (NO service restart)
+    val serviceNextOut = UserDictionaryProcessor.process("hi there", "en-US", serviceRepo, true)
+    assert(serviceNextOut == "hello there", "Existing TTS service repository sees UI-added entry without service restart")
+
+    // UI updates the entry replacement: "hello" -> "greetings"
+    val updatedEntry = newEntry.copy(replacement = "greetings")
+    uiRepo.updateEntry("en-US", uiDict.id, updatedEntry)
+
+    val serviceUpdateOut = UserDictionaryProcessor.process("hi there", "en-US", serviceRepo, true)
+    assert(serviceUpdateOut == "greetings there", "Existing TTS service repository sees UI-edited entry without service restart")
+
+    // UI disables dictionary
+    uiRepo.setDictionaryEnabled("en-US", uiDict.id, false)
+    val serviceDisabledOut = UserDictionaryProcessor.process("hi there", "en-US", serviceRepo, true)
+    assert(serviceDisabledOut == "hi there", "Existing TTS service repository sees UI-disabled dictionary without service restart")
+
+    // UI re-enables dictionary
+    uiRepo.setDictionaryEnabled("en-US", uiDict.id, true)
+    val serviceReEnabledOut = UserDictionaryProcessor.process("hi there", "en-US", serviceRepo, true)
+    assert(serviceReEnabledOut == "greetings there", "Existing TTS service repository sees UI-reenabled dictionary without service restart")
+
+    // UI deletes entry
+    uiRepo.deleteEntry("en-US", uiDict.id, newEntry.id)
+    val serviceDeletedOut = UserDictionaryProcessor.process("hi there", "en-US", serviceRepo, true)
+    assert(serviceDeletedOut == "hi there", "Existing TTS service repository sees UI-deleted entry without service restart")
+
+    // UI imports dictionary
+    val importDict = UserDictionary(
+        name = "Imported",
+        enabled = true,
+        entries = listOf(UserDictionaryEntry(source = "hi", replacement = "salute", matchMode = MatchMode.EXACT, caseSensitive = false))
+    )
+    val importJson = UserDictionaryJson.exportDictionary(importDict, "en-US")
+    uiRepo.importDictionary("en-US", importJson)
+    val serviceImportOut = UserDictionaryProcessor.process("hi there", "en-US", serviceRepo, true)
+    assert(serviceImportOut == "salute there", "Existing TTS service repository sees UI-imported dictionary without service restart")
+
+    // =========================================================================
+    // --- Suite 34: Strict Language / Locale Isolation ---
+    // =========================================================================
+    println("\n--- Suite 34: Strict Language / Locale Isolation ---")
+
+    val isoPrefs = MockSharedPreferences()
+    val isoRepo = UserDictionaryRepository(isoPrefs)
+
+    // 1. Add en-US with rule: "Hi" -> "Hello"
+    isoRepo.addLanguage("en-US")
+    val enUsDict = isoRepo.getDictionaries("en-US").first()
+    isoRepo.addEntry("en-US", enUsDict.id, UserDictionaryEntry(
+        source = "Hi",
+        replacement = "Hello",
+        matchMode = MatchMode.EXACT,
+        caseSensitive = false
+    ))
+
+    // 2. Add en-GB with rule: "Hi" -> "Good morning"
+    isoRepo.addLanguage("en-GB")
+    val enGbDict = isoRepo.getDictionaries("en-GB").first()
+    isoRepo.addEntry("en-GB", enGbDict.id, UserDictionaryEntry(
+        source = "Hi",
+        replacement = "Good morning",
+        matchMode = MatchMode.EXACT,
+        caseSensitive = false
+    ))
+
+    // 3. Add es-ES with rule: "hola" -> "saludos"
+    isoRepo.addLanguage("es-ES")
+    val esEsDict = isoRepo.getDictionaries("es-ES").first()
+    isoRepo.addEntry("es-ES", esEsDict.id, UserDictionaryEntry(
+        source = "hola",
+        replacement = "saludos",
+        matchMode = MatchMode.EXACT,
+        caseSensitive = false
+    ))
+
+    // 4. Verify en-US synthesizes "Hello"
+    val usResult = UserDictionaryProcessor.process("Hi friend", "en-US", isoRepo, true)
+    assert(usResult == "Hello friend", "en-US applies its own dictionary rule: 'Hi' -> 'Hello'")
+
+    // 5. Verify en-GB synthesizes "Good morning"
+    val gbResult = UserDictionaryProcessor.process("Hi friend", "en-GB", isoRepo, true)
+    assert(gbResult == "Good morning friend", "en-GB applies its own dictionary rule: 'Hi' -> 'Good morning'")
+
+    // 6. Verify en-US rules NEVER leak into en-GB
+    assert(gbResult != "Hello friend", "en-US dictionary rule does NOT leak into en-GB")
+
+    // 7. Verify en-GB rules NEVER leak into en-US
+    assert(usResult != "Good morning friend", "en-GB dictionary rule does NOT leak into en-US")
+
+    // 8. Verify es-ES synthesizes "saludos"
+    val esResult = UserDictionaryProcessor.process("hola amigo", "es-ES", isoRepo, true)
+    assert(esResult == "saludos amigo", "es-ES applies its own dictionary rule: 'hola' -> 'saludos'")
+
+    // 9. Verify es-ES rules NEVER leak into es-MX (which has no dictionary)
+    val mxResult = UserDictionaryProcessor.process("hola amigo", "es-MX", isoRepo, true)
+    assert(mxResult == "hola amigo", "es-ES dictionary rule does NOT leak into es-MX")
+
+    // 10. Verify language-only fallback does NOT leak en-US into base 'en' or unrelated locale 'en-CA'
+    val caResult = UserDictionaryProcessor.process("Hi friend", "en-CA", isoRepo, true)
+    assert(caResult == "Hi friend", "en-US rule does NOT leak into unconfigured en-CA")
+    val baseEnResult = UserDictionaryProcessor.process("Hi friend", "en", isoRepo, true)
+    assert(baseEnResult == "Hi friend", "en-US rule does NOT leak into base 'en'")
+
+    // 11. Verify underscore normalization: 'en_US' matches 'en-US'
+    val underscoreResult = UserDictionaryProcessor.process("Hi friend", "en_US", isoRepo, true)
+    assert(underscoreResult == "Hello friend", "Underscore tag 'en_US' normalizes and matches 'en-US'")
+
     println("   RESULTS: $passed PASSED, $failed FAILED")
     println("==================================================")
     if (failed > 0) {

@@ -38,8 +38,11 @@ object SettingsDefaults {
     const val KEY_SAMPLING_RATE = "sampling_rate"
     const val KEY_PHRASE_PREDICTION = "phrase_prediction"
     const val KEY_RESPECT_APP_VOICE = "respect_app_voice"
+    const val KEY_USER_DICTIONARY_ENABLED = "user_dictionary_enabled"
+    const val KEY_USER_DICTIONARIES_DATA = "user_dictionaries_data"
 
     // Defaults
+    const val DEFAULT_USER_DICTIONARY_ENABLED = true
     const val DEFAULT_VOICE_PROFILE = 0 // Reed
     const val DEFAULT_FORCE_SPEECH_RATE = false
     const val DEFAULT_SPEECH_RATE = 0 // Relative scale: -10..10 (0 = normal Eloquence speed 57)
@@ -83,7 +86,7 @@ object SettingsDefaults {
 
     // Supported languages
     val SUPPORTED_LANGUAGES = arrayOf(
-        "en-US", "en-GB", "es-ES", "es-US", "fr-FR", "fr-CA", "de-DE", "it-IT"
+        "en-US", "en-GB", "es-ES", "es-MX", "fr-FR", "fr-CA", "de-DE", "it-IT"
     )
 }
 
@@ -234,6 +237,13 @@ class Settings(val prefs: SharedPreferences) {
         get() = prefs.getBoolean(SettingsDefaults.KEY_RESPECT_APP_VOICE, SettingsDefaults.DEFAULT_RESPECT_APP_VOICE)
         set(value) = prefs.edit().putBoolean(SettingsDefaults.KEY_RESPECT_APP_VOICE, value).apply()
 
+    // User Dictionary
+    val userDictionaryRepository = UserDictionaryRepository(prefs)
+
+    var userDictionaryEnabled: Boolean
+        get() = prefs.getBoolean(SettingsDefaults.KEY_USER_DICTIONARY_ENABLED, SettingsDefaults.DEFAULT_USER_DICTIONARY_ENABLED)
+        set(value) = prefs.edit().putBoolean(SettingsDefaults.KEY_USER_DICTIONARY_ENABLED, value).apply()
+
     // Reset all settings to default
     fun resetAll() {
         prefs.edit()
@@ -262,6 +272,7 @@ class Settings(val prefs: SharedPreferences) {
             .putInt(SettingsDefaults.KEY_SAMPLING_RATE, SettingsDefaults.DEFAULT_SAMPLING_RATE)
             .putBoolean(SettingsDefaults.KEY_PHRASE_PREDICTION, SettingsDefaults.DEFAULT_PHRASE_PREDICTION)
             .putBoolean(SettingsDefaults.KEY_RESPECT_APP_VOICE, SettingsDefaults.DEFAULT_RESPECT_APP_VOICE)
+            .putBoolean(SettingsDefaults.KEY_USER_DICTIONARY_ENABLED, SettingsDefaults.DEFAULT_USER_DICTIONARY_ENABLED)
             .apply()
     }
 }

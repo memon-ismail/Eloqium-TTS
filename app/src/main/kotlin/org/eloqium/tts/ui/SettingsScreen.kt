@@ -1,5 +1,6 @@
 package org.eloqium.tts.ui
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -51,6 +52,13 @@ import org.eloqium.tts.engine.LocaleMatcher
 import org.eloqium.tts.service.Settings
 import org.eloqium.tts.service.SettingsDefaults
 
+sealed class SettingsSubScreen {
+    object SETTINGS : SettingsSubScreen()
+    object DICTIONARY_MANAGER : SettingsSubScreen()
+    data class LANGUAGE_DICTIONARIES(val languageTag: String) : SettingsSubScreen()
+    data class DICTIONARY_ENTRIES(val languageTag: String, val dictionaryId: String) : SettingsSubScreen()
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SettingsScreen(
@@ -62,6 +70,9 @@ fun SettingsScreen(
     val settings = activeSettings
 
     // State bindings
+    var currentSubScreen by remember { mutableStateOf<SettingsSubScreen>(SettingsSubScreen.SETTINGS) }
+    var userDictionaryEnabled by remember { mutableStateOf(settings.userDictionaryEnabled) }
+
     var voiceProfile by remember { mutableIntStateOf(settings.voiceProfile) }
     var forceSpeechRate by remember { mutableStateOf(settings.forceSpeechRate) }
     var speechRate by remember { mutableIntStateOf(settings.speechRate) }
@@ -133,6 +144,46 @@ fun SettingsScreen(
         forceLanguage = settings.forceLanguage
         language = settings.language
         samplingRate = settings.samplingRate
+        userDictionaryEnabled = settings.userDictionaryEnabled
+    }
+
+    BackHandler(enabled = (currentSubScreen !is SettingsSubScreen.SETTINGS)) {
+        when (val screen = currentSubScreen) {
+            is SettingsSubScreen.DICTIONARY_ENTRIES -> currentSubScreen = SettingsSubScreen.LANGUAGE_DICTIONARIES(screen.languageTag)
+            is SettingsSubScreen.LANGUAGE_DICTIONARIES -> currentSubScreen = SettingsSubScreen.DICTIONARY_MANAGER
+            is SettingsSubScreen.DICTIONARY_MANAGER -> currentSubScreen = SettingsSubScreen.SETTINGS
+            SettingsSubScreen.SETTINGS -> onNavigateBack()
+        }
+    }
+
+    when (val screen = currentSubScreen) {
+        is SettingsSubScreen.DICTIONARY_MANAGER -> {
+            DictionaryManagerScreen(
+                settings = settings,
+                onOpenLanguage = { currentSubScreen = SettingsSubScreen.LANGUAGE_DICTIONARIES(it) },
+                onNavigateBack = { currentSubScreen = SettingsSubScreen.SETTINGS }
+            )
+            return
+        }
+        is SettingsSubScreen.LANGUAGE_DICTIONARIES -> {
+            LanguageDictionariesScreen(
+                settings = settings,
+                languageTag = screen.languageTag,
+                onOpenDictionary = { dictId -> currentSubScreen = SettingsSubScreen.DICTIONARY_ENTRIES(screen.languageTag, dictId) },
+                onNavigateBack = { currentSubScreen = SettingsSubScreen.DICTIONARY_MANAGER }
+            )
+            return
+        }
+        is SettingsSubScreen.DICTIONARY_ENTRIES -> {
+            DictionaryEntriesScreen(
+                settings = settings,
+                languageTag = screen.languageTag,
+                dictionaryId = screen.dictionaryId,
+                onNavigateBack = { currentSubScreen = SettingsSubScreen.LANGUAGE_DICTIONARIES(screen.languageTag) }
+            )
+            return
+        }
+        SettingsSubScreen.SETTINGS -> { /* Fall through to main settings scaffold */ }
     }
 
     Scaffold(
@@ -364,7 +415,33 @@ fun SettingsScreen(
             )
 
             // =================================================================
-            // 4. LANGUAGE & AUDIO
+            // 4. USER DICTIONARY
+            // =================================================================
+            SettingsCategoryHeader(title = "User Dictionary")
+
+            SettingsSwitchItem(
+                title = "User Dictionary",
+                subtitle = if (userDictionaryEnabled) "On" else "Off",
+                checked = userDictionaryEnabled,
+                onCheckedChange = {
+                    userDictionaryEnabled = it
+                    settings.userDictionaryEnabled = it
+                }
+            )
+
+            SettingsClickableItem(
+                title = "Dictionaries",
+                subtitle = "Word replacements and pronunciations",
+                onClick = { currentSubScreen = SettingsSubScreen.DICTIONARY_MANAGER }
+            )
+
+            HorizontalDivider(
+                modifier = Modifier.padding(vertical = 8.dp),
+                color = DividerDefaults.color.copy(alpha = 0.5f)
+            )
+
+            // =================================================================
+            // 5. LANGUAGE & AUDIO
             // =================================================================
             SettingsCategoryHeader(title = "Language & Audio")
 

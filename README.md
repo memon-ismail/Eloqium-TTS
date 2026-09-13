@@ -9,9 +9,9 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/Version-0.1.1-blue.svg" alt="Version 0.1.1" />
+  <img src="https://img.shields.io/badge/Version-0.1.2-blue.svg" alt="Version 0.1.2" />
   <img src="https://img.shields.io/badge/License-Apache_2.0-blue.svg" alt="Apache 2.0 License" />
-  <img src="https://img.shields.io/badge/Platform-Android_8.0%2B-green.svg" alt="Android 8.0+" />
+  <img src="https://img.shields.io/badge/Platform-Android_6.0%2B-green.svg" alt="Android 6.0+" />
   <img src="https://img.shields.io/badge/Architecture-ARM64%20%7C%20ARMv7%20%7C%20x86__64-orange.svg" alt="Architecture" />
   <img src="https://img.shields.io/badge/Synthesis-100%25_Offline-brightgreen.svg" alt="100% Offline" />
   <img src="https://img.shields.io/badge/Voices-64_Voices-blueviolet.svg" alt="64 Voices" />
@@ -43,7 +43,7 @@
 
 ## About
  
-Eloqium TTS (version 0.1.1) is an independent open-source text-to-speech engine designed for Android screen-reader users and everyday speech output. It provides fast, clear, and highly responsive speech synthesis that works completely offline on your device.
+Eloqium TTS (version 0.1.2) is an independent open-source text-to-speech engine designed for Android screen-reader users and everyday speech output. It provides fast, clear, and highly responsive speech synthesis that works completely offline on your device.
  
 The project was created and is maintained by **Ismail Memon**.
 
@@ -60,11 +60,12 @@ Eloqium pairs an optimized native build of OpenEVV with modern Android accessibi
 ## Features
 
 - **64 Distinct Voices**: 8 language dialects with 8 selectable voice presets each (Reed, Shelley, Bobby, Rocko, Glen, Sandy, Grandma, Grandpa).
-- **Language and Regional Voice Support**: Native speech models for US English, UK English, Castilian Spanish, Latin American Spanish, French, Canadian French, German, and Italian.
+- **Language and Regional Voice Support**: Native speech models across 5 language families comprising 8 regional variants: US English, UK English, Castilian Spanish, Latin American Spanish, French, Canadian French, German, and Italian.
 - **Speech Rate Control**: Granular relative rate adjustment (-10 to +10) with an optional high-speed mode for advanced screen-reader users.
 - **Pitch and Tone Shaping**: Adjust pitch, inflection, head size, roughness, and breathiness to customize voice personality.
 - **Digital Volume Boost**: Clean PCM audio amplification with built-in clipping protection for noisy environments.
 - **Punctuation Controls**: Five selectable punctuation verbosity levels (None, Some, Most, All, Custom) matching screen-reader preferences and user-defined symbol speech.
+- **User Dictionary**: Multi-lingual, language-scoped pronunciation and word replacement dictionaries with 4 match modes (Exact match, Starts with, Ends with, Contains), case-sensitivity controls, JSON import/export, and Android file manager "Open With" integration.
 - **Intonation and Pause Controls**: Natural clause boundaries and customizable pause cadences.
 - **Emoji and Emoticon Speech**: Full spoken descriptions for over 3,800 Unicode emojis and common text emoticons.
 - **Number and Abbreviation Processing**: Context-aware expansion for common abbreviations and numbers without unexpected spelling pauses.
@@ -77,18 +78,18 @@ Eloqium pairs an optimized native build of OpenEVV with modern Android accessibi
 
 ## Supported Languages and Voices
 
-Eloqium provides 64 genuine voices across 8 language and regional variants:
+Eloqium provides 64 genuine voices across 5 language families comprising 8 regional variants:
 
-| Language | Locale Code | Region | Default Voice |
-| :--- | :--- | :--- | :--- |
-| **English (US)** | `en-US` / `eng-USA` | United States | `eng-USA-Reed` |
-| **English (UK)** | `en-GB` / `eng-GBR` | United Kingdom | `eng-GBR-Reed` |
-| **Spanish (Spain)** | `es-ES` / `spa-ESP` | Spain | `spa-ESP-Reed` |
-| **Spanish (Latin America)** | `es-MX` / `spa-MEX` | Latin America / Mexico | `spa-MEX-Reed` |
-| **French (France)** | `fr-FR` / `fra-FRA` | France | `fra-FRA-Reed` |
-| **French (Canada)** | `fr-CA` / `fra-CAN` | Canada | `fra-CAN-Reed` |
-| **German** | `de-DE` / `deu-DEU` | Germany | `deu-DEU-Reed` |
-| **Italian** | `it-IT` / `ita-ITA` | Italy | `ita-ITA-Reed` |
+| Language Family | Regional Variant | Locale Code | Region | Default Voice |
+| :--- | :--- | :--- | :--- | :--- |
+| **English** | English (US) | `en-US` / `eng-USA` | United States | `eng-USA-Reed` |
+| **English** | English (UK) | `en-GB` / `eng-GBR` | United Kingdom | `eng-GBR-Reed` |
+| **Spanish** | Spanish (Spain) | `es-ES` / `spa-ESP` | Spain | `spa-ESP-Reed` |
+| **Spanish** | Spanish (Latin America) | `es-MX` / `spa-MEX` | Latin America / Mexico | `spa-MEX-Reed` |
+| **French** | French (France) | `fr-FR` / `fra-FRA` | France | `fra-FRA-Reed` |
+| **French** | French (Canada) | `fr-CA` / `fra-CAN` | Canada | `fra-CAN-Reed` |
+| **German** | German (Germany) | `de-DE` / `deu-DEU` | Germany | `deu-DEU-Reed` |
+| **Italian** | Italian (Italy) | `it-IT` / `ita-ITA` | Italy | `ita-ITA-Reed` |
 
 Each language includes 8 voice presets:
 1. **Reed** (Default clear voice)
@@ -137,6 +138,7 @@ The **Eloqium settings** screen allows you to fine-tune speech parameters:
 - **Emoji and Emoticons**: Toggle spoken announcements for emojis and text smiles.
 - **Number Processing**: Choose between natural numbers and individual digit reading.
 - **Abbreviations**: Enable or disable context-sensitive abbreviation expansion.
+- **User Dictionary**: Toggle global dictionary processing on/off and open the **Dictionary Manager** to configure languages, add custom word replacements, and import/export JSON dictionaries.
 - **Audio Sample Rate**: Select 11,025 Hz or 22,050 Hz.
 - **Reset All Settings**: Restore all configuration values to their defaults.
 
@@ -164,7 +166,7 @@ When reading rapidly with TalkBack, Eloqium aborts previous speech instantly upo
 ## Building From Source
 
 ### Prerequisites
-- Android SDK (API 35+) and Android NDK (version 26.1.10909125 or newer).
+- Android SDK (minSdk 23, compileSdk 36, targetSdk 35) and Android NDK (version 26.1.10909125 or newer).
 - JDK 17.
 - Git with submodule support.
 
@@ -203,15 +205,16 @@ Eloqium processes speech requests through a thread-safe, unidirectional pipeline
              v
 [EloqiumTtsService (Android TextToSpeechService)]
              |
+             +--> UserDictionaryProcessor (Language-scoped word & phrase replacements)
              +--> AbbreviationProcessor (Grammar & context expansion)
              +--> EmojiProcessor & EmoticonProcessor (Spoken descriptions)
              +--> NumberProcessor (Digits vs. numeric reading)
+             +--> Intonation pause mode resolution (PAUSE_KEEP vs. PAUSE_ALL)
              +--> UnicodeNormalizer (NFKC canonical folding)
-             +--> ScreenReaderPunctuationProcessor (Verbosity filtering)
+             +--> ScreenReaderPunctuationProcessor (Verbosity filtering: None, Some, Most, All, Custom)
              +--> OpenEVVCompatibilityFixes (Token & separator rules)
              +--> Chunker (Boundary-aware segmentation)
-             +--> PauseProcessor (Clause markers)
-             +--> OpenEVVEncoder (Latin-1 byte mapping)
+             +--> PauseProcessor & OpenEVVEncoder (Clause markers & Latin-1 byte mapping)
              |
              v
 [Native JNI Bridge (libeloqiumjni.so)]
@@ -252,7 +255,7 @@ Eloqium relies exclusively on open-source Android Jetpack and Kotlin libraries:
 
 - **Clean-Room Abbreviation Processor**: All abbreviations and disambiguation rules are implemented in Kotlin (`AbbreviationProcessor.kt`) under the Apache 2.0 license.
 - **Proprietary Dictionaries Excluded**: Proprietary binary dictionary formats (`.cfd`, `.dct`, `.jdf`) are intentionally excluded to respect copyright boundaries.
-- **Future Custom Pronunciation Support**: Any future user pronunciation features will utilize open-source, permissive dictionary pairs (such as CC0/MIT word lists) parsed entirely in memory.
+- **User Dictionary Subsystem**: Eloqium TTS includes an open-format User Dictionary subsystem storing user-defined word and phrase replacements in standard JSON (Version 1). Dictionaries operate locally on device with zero network transmission, supporting language-scoped isolation, four match modes (Exact match, Starts with, Ends with, Contains), case sensitivity, and non-cascading single-pass replacements.
 
 ---
 

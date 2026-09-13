@@ -27,6 +27,7 @@ import org.eloqium.tts.pipeline.PauseProcessor
 import org.eloqium.tts.pipeline.ScreenReaderPunctuationProcessor
 import org.eloqium.tts.pipeline.TextRequest
 import org.eloqium.tts.pipeline.UnicodeNormalizer
+import org.eloqium.tts.pipeline.UserDictionaryProcessor
 
 class EloqiumTtsService : TextToSpeechService() {
 
@@ -329,8 +330,20 @@ class EloqiumTtsService : TextToSpeechService() {
 
             val langCode = entry.iso2Lang
 
+            // Pipeline step 0: User Dictionary replacements (takes precedence over abbreviations)
+            val userDictProcessed = if (settings.userDictionaryEnabled) {
+                UserDictionaryProcessor.process(
+                    text = rawText,
+                    languageTag = entry.bcp47Tag,
+                    repository = settings.userDictionaryRepository,
+                    enabled = true
+                )
+            } else {
+                rawText
+            }
+
             // Pipeline step 1: Abbreviations expansion
-            val abbrProcessed = AbbreviationProcessor.process(rawText, settings.useAbbreviations)
+            val abbrProcessed = AbbreviationProcessor.process(userDictProcessed, settings.useAbbreviations)
 
             // Pipeline step 2: Emoji & Emoticons
             try {
