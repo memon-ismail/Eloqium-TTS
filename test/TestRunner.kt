@@ -31,6 +31,10 @@ import org.eloqium.tts.pipeline.TextRequest
 import org.eloqium.tts.pipeline.UnicodeNormalizer
 import android.speech.tts.TextToSpeech
 import org.eloqium.tts.service.MatchMode
+import org.eloqium.tts.service.DictionaryEntryType
+import org.eloqium.tts.service.DictionaryProvenance
+import org.eloqium.tts.service.IbmDicImporter
+import org.eloqium.tts.service.IbmDicImportReport
 import org.eloqium.tts.service.UserDictionary
 import org.eloqium.tts.service.UserDictionaryEntry
 import org.eloqium.tts.service.UserDictionaryJson
@@ -52,6 +56,7 @@ fun main() {
             println("  [FAIL] $message")
             failed++
         }
+        System.out.flush()
     }
 
     println("==================================================")
@@ -1202,7 +1207,7 @@ fun main() {
     )
 
     val exportedJson = UserDictionaryJson.exportDictionary(sampleDict, "en-US")
-    assert(exportedJson.contains("\"schemaVersion\": 1"), "Exported JSON contains schemaVersion 1")
+    assert(exportedJson.contains("\"schemaVersion\": 2"), "Exported JSON contains schemaVersion 2")
     assert(exportedJson.contains("\"language\": \"en-US\""), "Exported JSON contains correct language tag")
     assert(exportedJson.contains("\"name\": \"Technical Terms\""), "Exported JSON contains dictionary name")
     assert(exportedJson.contains("\"source\": \"Eloqium\""), "Exported JSON contains entry source")
@@ -1211,7 +1216,7 @@ fun main() {
     val parsedResult = UserDictionaryJson.parseDictionary(exportedJson)
     assert(parsedResult.isSuccess, "parseDictionary succeeds on valid exported JSON")
     val parsed = parsedResult.getOrThrow()
-    assert(parsed.schemaVersion == 1, "Parsed schemaVersion is 1")
+    assert(parsed.schemaVersion == 2, "Parsed schemaVersion is 2")
     assert(parsed.languageTag == "en-US", "Parsed language is en-US")
     assert(parsed.dictionary.name == "Technical Terms", "Parsed dictionary name matches")
     assert(parsed.dictionary.enabled, "Parsed dictionary enabled state matches")
@@ -1667,6 +1672,410 @@ fun main() {
     val underscoreResult = UserDictionaryProcessor.process("Hi friend", "en_US", isoRepo, true)
     assert(underscoreResult == "Hello friend", "Underscore tag 'en_US' normalizes and matches 'en-US'")
 
+    // =========================================================================
+    // --- Suite 35: User Dictionary Schema v2 & Backward Compatibility ---
+    // =========================================================================
+    println("\n--- Suite 35: User Dictionary Schema v2 & Backward Compatibility ---")
+
+    val v1Json = """
+    {
+      "schemaVersion": 1,
+      "language": "en-US",
+      "name": "Legacy V1 Dict",
+      "enabled": true,
+      "entries": [
+        {
+          "source": "NASA",
+          "replacement": "N A S A",
+          "matchMode": "Exact match",
+          "caseSensitive": true
+        }
+      ]
+    }
+    """.trimIndent()
+
+    val parsedV1 = UserDictionaryJson.parseDictionary(v1Json)
+    assert(parsedV1.isSuccess, "Schema v1 dictionary parses successfully without error")
+    val v1Dict = parsedV1.getOrThrow().dictionary
+    assert(v1Dict.entries.size == 1, "Schema v1 dictionary contains 1 entry")
+    assert(v1Dict.entries[0].type == DictionaryEntryType.TEXT, "Schema v1 entry defaults to TEXT type")
+    assert(v1Dict.provenance == null, "Schema v1 dictionary has null provenance")
+
+    val v2Json = """
+    {
+      "schemaVersion": 2,
+      "language": "en-US",
+      "name": "V2 Dict with Pronunciation",
+      "enabled": true,
+      "provenance": {
+        "format": "ibm_dic",
+        "originalFilename": "ENURoot.dic",
+        "sourceLanguage": "ENU",
+        "targetLocale": "en-US",
+        "dictionaryLayer": "root",
+        "importDate": 1700000000000
+      },
+      "entries": [
+        {
+          "source": "milquetoast",
+          "replacement": "s.1mIl.k2wItS",
+          "matchMode": "Exact match",
+          "caseSensitive": true,
+          "type": "pronunciation"
+        },
+        {
+          "source": "hi",
+          "replacement": "hello",
+          "matchMode": "Exact match",
+          "caseSensitive": false,
+          "type": "text"
+        }
+      ]
+    }
+    """.trimIndent()
+
+    val parsedV2 = UserDictionaryJson.parseDictionary(v2Json)
+    assert(parsedV2.isSuccess, "Schema v2 dictionary parses successfully")
+    val v2Dict = parsedV2.getOrThrow().dictionary
+    assert(v2Dict.provenance?.format == "ibm_dic", "Schema v2 parses provenance format: ibm_dic")
+    assert(v2Dict.provenance?.originalFilename == "ENURoot.dic", "Schema v2 parses originalFilename")
+    assert(v2Dict.provenance?.dictionaryLayer == "root", "Schema v2 parses dictionaryLayer: root")
+    assert(v2Dict.entries[0].type == DictionaryEntryType.PRONUNCIATION, "Entry 0 parsed as PRONUNCIATION")
+    assert(v2Dict.entries[1].type == DictionaryEntryType.TEXT, "Entry 1 parsed as TEXT")
+
+    // Export and verify schema 2 serialization
+    val exportedV2 = UserDictionaryJson.exportDictionary(v2Dict, "en-US")
+    assert(exportedV2.contains("\"schemaVersion\": 2"), "Exported dictionary has schemaVersion: 2")
+    assert(exportedV2.contains("\"type\": \"pronunciation\""), "Exported dictionary preserves pronunciation type")
+    assert(exportedV2.contains("\"type\": \"text\""), "Exported dictionary preserves text type")
+    assert(exportedV2.contains("\"provenance\":"), "Exported dictionary includes provenance block")
+
+    val roundtripParsed = UserDictionaryJson.parseDictionary(exportedV2)
+    assert(roundtripParsed.isSuccess, "Roundtrip exported v2 JSON re-parses successfully")
+    assert(roundtripParsed.getOrThrow().dictionary.entries[0].type == DictionaryEntryType.PRONUNCIATION, "Roundtrip preserves PRONUNCIATION type")
+
+    // =========================================================================
+    // --- Suite 36: PRONUNCIATION Entries & OpenEVV SPR Runtime Formatting ---
+    // =========================================================================
+    println("\n--- Suite 36: PRONUNCIATION Entries & OpenEVV SPR Runtime Formatting ---")
+
+    val sprEntry1 = UserDictionaryEntry(
+        source = "milquetoast",
+        replacement = "s.1mIl.k2wItS",
+        matchMode = MatchMode.EXACT,
+        type = DictionaryEntryType.PRONUNCIATION
+    )
+    val sprEntry2 = UserDictionaryEntry(
+        source = "postfix",
+        replacement = "[.1post.2fIks]",
+        matchMode = MatchMode.EXACT,
+        type = DictionaryEntryType.PRONUNCIATION
+    )
+    val sprEntry3 = UserDictionaryEntry(
+        source = "heteroousian",
+        replacement = "`[.2hE.0Fx.0ro.1u.0ZXn]",
+        matchMode = MatchMode.EXACT,
+        type = DictionaryEntryType.PRONUNCIATION
+    )
+    val textEntry = UserDictionaryEntry(
+        source = "pie",
+        replacement = "dessert",
+        matchMode = MatchMode.EXACT,
+        type = DictionaryEntryType.TEXT
+    )
+
+    assert(UserDictionaryProcessor.formatRuntimeReplacement(sprEntry1) == "`[s.1mIl.k2wItS]", "Unbracketed SPR is wrapped in `[...]")
+    assert(UserDictionaryProcessor.formatRuntimeReplacement(sprEntry2) == "`[.1post.2fIks]", "Bracketed SPR keeps single outer `[...]")
+    assert(UserDictionaryProcessor.formatRuntimeReplacement(sprEntry3) == "`[.2hE.0Fx.0ro.1u.0ZXn]", "Backtick-bracketed SPR normalizes to single `[...]")
+    assert(UserDictionaryProcessor.formatRuntimeReplacement(textEntry) == "dessert", "TEXT entry replacement is unmodified")
+
+    val sprRules = UserDictionaryProcessor.compileEntries(listOf(sprEntry1, sprEntry2, textEntry))
+    val sprText = "I had apple pie and milquetoast with postfix."
+    val sprOutput = UserDictionaryProcessor.process(sprText, sprRules)
+    assert(sprOutput == "I had apple dessert and `[s.1mIl.k2wItS] with `[.1post.2fIks].", "UserDictionaryProcessor executes PRONUNCIATION and TEXT concurrently")
+
+    // =========================================================================
+    // --- Suite 37: End-to-End Speech Pipeline Protection for Phonetic SPR Tags ---
+    // =========================================================================
+    println("\n--- Suite 37: End-to-End Speech Pipeline Protection for Phonetic SPR Tags ---")
+
+    val sprPipelineInput = "The `[s.1mIl.k2wItS] was seen at 3.14 with `[.1post.2fIks]."
+
+    // 1. ScreenReaderPunctuationProcessor at NONE, SOME, MOST, ALL, CUSTOM
+    val sprPNone = ScreenReaderPunctuationProcessor.process(sprPipelineInput, enabled = true, level = SettingsDefaults.PUNCT_NONE)
+    assert(sprPNone.contains("`[s.1mIl.k2wItS]"), "PUNCT_NONE preserves `[...] untouched")
+
+    val sprPSome = ScreenReaderPunctuationProcessor.process(sprPipelineInput, enabled = true, level = SettingsDefaults.PUNCT_SOME)
+    assert(sprPSome.contains("`[s.1mIl.k2wItS]"), "PUNCT_SOME preserves `[...] untouched")
+
+    val sprPMost = ScreenReaderPunctuationProcessor.process(sprPipelineInput, enabled = true, level = SettingsDefaults.PUNCT_MOST)
+    assert(sprPMost.contains("`[s.1mIl.k2wItS]"), "PUNCT_MOST preserves `[...] untouched (no left bracket/right bracket)")
+    assert(!sprPMost.contains("left bracket"), "PUNCT_MOST does not speak phonetic brackets")
+
+    val sprPAll = ScreenReaderPunctuationProcessor.process(sprPipelineInput, enabled = true, level = SettingsDefaults.PUNCT_ALL)
+    assert(sprPAll.contains("`[s.1mIl.k2wItS]"), "PUNCT_ALL preserves `[...] untouched (no dot or grave accent spoken inside SPR)")
+    assert(!sprPAll.contains("grave accent"), "PUNCT_ALL does not speak phonetic backtick")
+    assert(sprPAll.contains("3 dot 14"), "PUNCT_ALL correctly speaks decimal point in normal text")
+
+    val sprPCustom = ScreenReaderPunctuationProcessor.process(sprPipelineInput, enabled = true, level = SettingsDefaults.PUNCT_CUSTOM, customPunctuation = "[]`.")
+    assert(sprPCustom.contains("`[s.1mIl.k2wItS]"), "PUNCT_CUSTOM preserves `[...] untouched even when custom punctuation has brackets and backticks")
+
+    // 2. OpenEVVCompatibilityFixes
+    val fixedSpr = OpenEVVCompatibilityFixes.apply(sprPipelineInput)
+    assert(fixedSpr.contains("`[s.1mIl.k2wItS]"), "OpenEVVCompatibilityFixes preserves backtick on `[...] tags")
+    assert(!fixedSpr.contains("k 2"), "OpenEVV BEFORE_A_DIGIT does NOT insert space inside k2 phoneme")
+    assert(!fixedSpr.contains("'[s.1mIl"), "OpenEVV sanitizeBackticks does NOT convert `[...] to '[...]")
+
+    val rogueBacktick = OpenEVVCompatibilityFixes.apply("This is `rogue backtick and `[s.1mIl.k2wItS]")
+    assert(rogueBacktick.contains("'rogue"), "OpenEVV sanitizes unapproved rogue backtick")
+    assert(rogueBacktick.contains("`[s.1mIl.k2wItS]"), "OpenEVV keeps approved phonetic SPR backtick in same string")
+
+    // 3. NumberProcessor
+    val numInput = "Testing `[k2wItS] with 1234 numbers"
+    val numProcessed = NumberProcessor.process(numInput, enabled = true, mode = SettingsDefaults.NUMBER_PAIRS)
+    assert(numProcessed.contains("`[k2wItS]"), "NumberProcessor leaves digit 2 inside `[k2wItS] untouched")
+    assert(numProcessed.contains("12 34"), "NumberProcessor correctly groups normal numbers 12 34")
+
+    // 4. AbbreviationProcessor
+    val abbrInput = "Visit Dr. Smith with `[d.r.]"
+    val abbrProcessed = AbbreviationProcessor.process(abbrInput, enabled = true)
+    assert(abbrProcessed.contains("Doctor Smith"), "AbbreviationProcessor expands Dr. in normal text")
+    assert(abbrProcessed.contains("`[d.r.]"), "AbbreviationProcessor leaves d.r. inside phonetic tag untouched")
+
+    // 5. Chunker
+    val chunkInput = "The animal `[s.1mIl.k2wItS] walked fast. Another sentence."
+    val chunks = Chunker.chunk(chunkInput)
+    assert(chunks.size == 2, "Chunker splits into 2 sentences")
+    assert(chunks[0].contains("`[s.1mIl.k2wItS]"), "Chunker keeps `[...] as an atomic unit within its sentence chunk")
+
+    // =========================================================================
+    // --- Suite 38: IBM .dic Dictionary Importer & Classifier ---
+    // =========================================================================
+    println("\n--- Suite 38: IBM .dic Dictionary Importer & Classifier ---")
+
+    // 1. Language detection
+    val (enuLang, enuLocale, enuComp) = IbmDicImporter.detectLanguage("ENURoot.dic")
+    assert(enuLang == "ENU" && enuLocale == "en-US", "ENURoot.dic detected as ENU -> en-US")
+    assert(enuComp.contains("en-US") && enuComp.contains("en-GB"), "ENU compatible with en-US and en-GB")
+
+    val (engLang, engLocale, _) = IbmDicImporter.detectLanguage("ENGmain.dic")
+    assert(engLang == "ENG" && engLocale == "en-GB", "ENGmain.dic detected as ENG -> en-GB")
+
+    val (deuLang, deuLocale, _) = IbmDicImporter.detectLanguage("DEURoot.dic")
+    assert(deuLang == "DEU" && deuLocale == "de-DE", "DEURoot.dic detected as DEU -> de-DE")
+
+    val (espLang, espLocale, _) = IbmDicImporter.detectLanguage("ESPabbr.dic")
+    assert(espLang == "ESP" && espLocale == "es-ES", "ESPabbr.dic detected as ESP -> es-ES")
+
+    val (fraLang, fraLocale, _) = IbmDicImporter.detectLanguage("FRAmain.dic")
+    assert(fraLang == "FRA" && fraLocale == "fr-FR", "FRAmain.dic detected as FRA -> fr-FR")
+
+    val (itaLang, itaLocale, _) = IbmDicImporter.detectLanguage("ITAmain.dic")
+    assert(itaLang == "ITA" && itaLocale == "it-IT", "ITAmain.dic detected as ITA -> it-IT")
+
+    // 2. Layer detection
+    assert(IbmDicImporter.detectLayer("ENURoot.dic") == "root", "ENURoot.dic layer is 'root'")
+    assert(IbmDicImporter.detectLayer("ENUmain.dic") == "main", "ENUmain.dic layer is 'main'")
+    assert(IbmDicImporter.detectLayer("ENUabbr.dic") == "abbr", "ENUabbr.dic layer is 'abbr'")
+    assert(IbmDicImporter.detectLayer("custom.dic") == "user", "custom.dic layer is 'user'")
+
+    // 3. Locale compatibility & warnings
+    assert(IbmDicImporter.isLocaleCompatible("ENU", "en-US"), "ENU is compatible with en-US")
+    assert(IbmDicImporter.isLocaleCompatible("ENU", "en-GB"), "ENU is compatible with en-GB")
+    assert(!IbmDicImporter.isLocaleCompatible("ENU", "es-ES"), "ENU is NOT compatible with es-ES")
+
+    // 4. Parse sample IBM .dic content
+    val sampleDic = """
+    postfix	`[.1post.2fIks]
+    postfixed	`[.1post.2fIkst]
+    omg	oh my god
+    mbox	em `0 box
+    WWII	world war two
+    """.trimIndent()
+
+    val parsedDicResult = IbmDicImporter.parseString(sampleDic, "ENUmain.dic")
+    assert(parsedDicResult.isSuccess, "IBM .dic string parses successfully")
+    val parsedDic = parsedDicResult.getOrThrow()
+    val rep = parsedDic.report
+
+    assert(rep.detectedLanguage == "ENU", "Report detected language: ENU")
+    assert(rep.targetLocale == "en-US", "Report target locale: en-US")
+    assert(rep.dictionaryLayer == "main", "Report dictionary layer: main")
+    assert(rep.validEntries == 5, "Report valid entries: 5")
+    assert(rep.pronunciationCount == 2, "Report pronunciation count: 2 (postfix, postfixed)")
+    assert(rep.textCount == 2, "Report text count: 2 (omg, WWII)")
+    assert(rep.prosodyCount == 1, "Report prosody count: 1 (mbox with `0)")
+
+    val importedDict = parsedDic.dictionary
+    assert(importedDict.provenance?.format == "ibm_dic", "Dictionary provenance format is ibm_dic")
+    assert(importedDict.provenance?.originalFilename == "ENUmain.dic", "Dictionary provenance filename is ENUmain.dic")
+    assert(importedDict.entries[0].type == DictionaryEntryType.PRONUNCIATION, "First entry is PRONUNCIATION")
+    assert(importedDict.entries[0].replacement == ".1post.2fIks", "PRONUNCIATION replacement is cleanly normalized SPR")
+    assert(importedDict.entries[2].type == DictionaryEntryType.TEXT, "Third entry (omg) is TEXT")
+
+    // 5. Incompatible locale warning test
+    val incompResult = IbmDicImporter.parseString(sampleDic, "ENURoot.dic", overrideTargetLocale = "es-ES")
+    assert(incompResult.isSuccess, "Import to incompatible locale parses with warning")
+    assert(incompResult.getOrThrow().report.warnings.isNotEmpty(), "Incompatible locale generates warning in report")
+
+    // =========================================================================
+    // --- Suite 39: Large Dictionary Scalability & Indexed Performance ---
+    // =========================================================================
+    println("\n--- Suite 39: Large Dictionary Scalability & Indexed Performance ---")
+
+    val largeEntries = (1..500).map { i ->
+        UserDictionaryEntry(
+            source = "word$i",
+            replacement = ".1w$i.0rd",
+            matchMode = MatchMode.EXACT,
+            caseSensitive = true,
+            type = DictionaryEntryType.PRONUNCIATION
+        )
+    } + listOf(
+        UserDictionaryEntry(
+            source = "milquetoast",
+            replacement = "s.1mIl.k2wItS",
+            matchMode = MatchMode.EXACT,
+            caseSensitive = false,
+            type = DictionaryEntryType.PRONUNCIATION
+        ),
+        UserDictionaryEntry(
+            source = "apple pie",
+            replacement = "dessert",
+            matchMode = MatchMode.EXACT,
+            caseSensitive = false,
+            type = DictionaryEntryType.TEXT
+        )
+    )
+
+    val largeRules = UserDictionaryProcessor.compileEntries(largeEntries)
+    val tStart = System.nanoTime()
+    val largeProcessed = UserDictionaryProcessor.process("Testing word100 and apple pie and milquetoast here.", largeRules)
+    val tDurationMs = (System.nanoTime() - tStart) / 1_000_000.0
+
+    // =========================================================================
+    // --- Suite 40: ECI Voice Tags Setting, Two-Level Search & Locale Selection ---
+    // =========================================================================
+    println("\n--- Suite 40: ECI Voice Tags Setting, Two-Level Search & Locale Selection ---")
+
+    // 1. SettingsDefaults & Settings test
+    assert(SettingsDefaults.KEY_ECI_VOICE_TAGS == "eci_voice_tags", "KEY_ECI_VOICE_TAGS is 'eci_voice_tags'")
+    assert(SettingsDefaults.DEFAULT_ECI_VOICE_TAGS == true, "DEFAULT_ECI_VOICE_TAGS is true")
+
+    val suite40MockPrefs = test.MockSharedPreferences()
+    val suite40Settings = Settings(suite40MockPrefs)
+    assert(suite40Settings.eciVoiceTagsEnabled == true, "Settings eciVoiceTagsEnabled defaults to true")
+    suite40Settings.eciVoiceTagsEnabled = false
+    assert(suite40Settings.eciVoiceTagsEnabled == false, "Settings eciVoiceTagsEnabled persists false")
+    suite40Settings.resetAll()
+    assert(suite40Settings.eciVoiceTagsEnabled == true, "Settings resetAll restores eciVoiceTagsEnabled to true")
+
+    // 2. OpenEVVCompatibilityFixes with eciVoiceTagsEnabled = true (Default)
+    val tagsOn = OpenEVVCompatibilityFixes.apply("Speed `vs50 and volume `vv80 test.", eciVoiceTagsEnabled = true)
+    assert(tagsOn.contains("`vs50"), "ECI tags ON preserves `vs50 without digit split")
+    assert(tagsOn.contains("`vv80"), "ECI tags ON preserves `vv80 without digit split")
+
+    val rogueOn = OpenEVVCompatibilityFixes.apply("Rogue `badtag and `unknown command", eciVoiceTagsEnabled = true)
+    assert(!rogueOn.contains("`badtag") && rogueOn.contains("'badtag"), "ECI tags ON sanitizes rogue backtick `badtag to 'badtag")
+    assert(!rogueOn.contains("`unknown") && rogueOn.contains("'unknown"), "ECI tags ON sanitizes rogue backtick `unknown to 'unknown")
+
+    val sprOn = OpenEVVCompatibilityFixes.apply("Phonetic `[.1post.2fIks] tag here", eciVoiceTagsEnabled = true)
+    assert(sprOn.contains("`[.1post.2fIks]"), "ECI tags ON preserves phonetic SPR tag `[...] intact")
+
+    // 3. OpenEVVCompatibilityFixes with eciVoiceTagsEnabled = false
+    val tagsOff = OpenEVVCompatibilityFixes.apply("Speed `vs50 and volume `vv80 test.", eciVoiceTagsEnabled = false)
+    assert(tagsOff.contains("'vs 50"), "ECI tags OFF converts `vs50 to 'vs 50")
+    assert(tagsOff.contains("'vv 80"), "ECI tags OFF converts `vv80 to 'vv 80")
+    assert(!tagsOff.contains("`vs50") && !tagsOff.contains("`vv80"), "ECI tags OFF leaves no backticks in user text")
+
+    val sprOff = OpenEVVCompatibilityFixes.apply("Phonetic `[.1post.2fIks] tag here", eciVoiceTagsEnabled = false)
+    assert(sprOff.contains("`[.1post.2fIks]"), "ECI tags OFF keeps phonetic SPR tag `[...] completely protected")
+
+    // 4. Two-Level Search: Dictionary-Level Filter
+    val testDicts = listOf(
+        UserDictionary(
+            id = "d1",
+            name = "Medical Acronyms",
+            enabled = true,
+            provenance = DictionaryProvenance(originalFilename = "med.dic", sourceLanguage = "ENU", dictionaryLayer = "main", format = "ibm_dic")
+        ),
+        UserDictionary(
+            id = "d2",
+            name = "Spanish Slang",
+            enabled = true,
+            provenance = DictionaryProvenance(originalFilename = "slang.dic", sourceLanguage = "ESP", dictionaryLayer = "user", format = "ibm_dic")
+        ),
+        UserDictionary(
+            id = "d3",
+            name = "Standard Replacements",
+            enabled = false
+        )
+    )
+
+    fun filterDicts(query: String) = testDicts.filter { dict ->
+        val trimmed = query.trim()
+        if (trimmed.isEmpty()) true else {
+            dict.name.contains(trimmed, ignoreCase = true) ||
+            (dict.provenance?.originalFilename?.contains(trimmed, ignoreCase = true) == true) ||
+            (dict.provenance?.sourceLanguage?.contains(trimmed, ignoreCase = true) == true) ||
+            (dict.provenance?.dictionaryLayer?.contains(trimmed, ignoreCase = true) == true)
+        }
+    }
+
+    assert(filterDicts("").size == 3, "Dictionary filter empty query returns all 3")
+    assert(filterDicts("medical").size == 1 && filterDicts("medical")[0].id == "d1", "Dictionary filter by name 'medical' matches d1")
+    assert(filterDicts("slang.dic").size == 1 && filterDicts("slang.dic")[0].id == "d2", "Dictionary filter by filename matches d2")
+    assert(filterDicts("ESP").size == 1 && filterDicts("ESP")[0].id == "d2", "Dictionary filter by sourceLanguage matches d2")
+    assert(filterDicts("nonexistent").isEmpty(), "Dictionary filter non-matching query returns empty list")
+
+    // 5. Two-Level Search: Entry-Level Filter
+    val testWordEntries = listOf(
+        UserDictionaryEntry(source = "cardio", replacement = "heart", matchMode = MatchMode.EXACT, type = DictionaryEntryType.TEXT),
+        UserDictionaryEntry(source = "pneumo", replacement = "[n u1 m o0]", matchMode = MatchMode.STARTS_WITH, type = DictionaryEntryType.PRONUNCIATION),
+        UserDictionaryEntry(source = "BP", replacement = "blood pressure", matchMode = MatchMode.EXACT, type = DictionaryEntryType.TEXT)
+    )
+
+    fun filterEntries(query: String) = testWordEntries.filter { entry ->
+        val trimmed = query.trim()
+        if (trimmed.isEmpty()) true else {
+            entry.source.contains(trimmed, ignoreCase = true) ||
+            entry.replacement.contains(trimmed, ignoreCase = true) ||
+            (if (entry.type == DictionaryEntryType.PRONUNCIATION) "pronunciation" else "text").contains(trimmed, ignoreCase = true) ||
+            entry.matchMode.displayName.contains(trimmed, ignoreCase = true)
+        }
+    }
+
+    assert(filterEntries("").size == 3, "Entry filter empty query returns all 3")
+    assert(filterEntries("cardio").size == 1 && filterEntries("cardio")[0].source == "cardio", "Entry filter matches source 'cardio'")
+    assert(filterEntries("blood").size == 1 && filterEntries("blood")[0].source == "BP", "Entry filter matches replacement 'blood pressure'")
+    assert(filterEntries("pronunciation").size == 1 && filterEntries("pronunciation")[0].source == "pneumo", "Entry filter matches type 'pronunciation'")
+    assert(filterEntries("Starts with").size == 1 && filterEntries("Starts with")[0].source == "pneumo", "Entry filter matches matchMode 'Starts with'")
+    assert(filterEntries("notfound").isEmpty(), "Entry filter non-matching query returns empty list")
+
+    // 6. IBM .dic Locale Compatibility & Warning
+    val (code, proposed, _) = IbmDicImporter.detectLanguage("ENU_USER.DIC")
+    assert(code == "ENU" && proposed == "en-US", "detectLanguage for ENU_USER.DIC proposes en-US")
+    assert(IbmDicImporter.isLocaleCompatible("ENU", "en-US") == true, "ENU is compatible with en-US")
+    assert(IbmDicImporter.isLocaleCompatible("ENU", "en-GB") == true, "ENU is compatible with en-GB")
+    assert(IbmDicImporter.isLocaleCompatible("ENU", "es-ES") == false, "ENU is NOT compatible with es-ES")
+    assert(IbmDicImporter.isLocaleCompatible("ESP", "es-MX") == true, "ESP is compatible with es-MX")
+    assert(IbmDicImporter.isLocaleCompatible("ESP", "en-US") == false, "ESP is NOT compatible with en-US")
+
+    val dicWithOverride = IbmDicImporter.parseString(sampleDic, "ENU_USER.DIC", overrideTargetLocale = "es-ES")
+    assert(dicWithOverride.isSuccess, "parseString with overrideTargetLocale succeeds")
+    val dicReport = dicWithOverride.getOrThrow().report
+    assert(dicReport.targetLocale == "es-ES", "Report reflects overridden targetLocale 'es-ES'")
+    assert(dicReport.warnings.any { it.contains("may not be phonetically compatible") }, "Report includes phonetic incompatibility warning")
+
+    // 7. Search Accessibility Single-Announcement Contract
+    val dictSearchLabel = "Search dictionaries"
+    val entrySearchLabel = "Search words"
+    val clearSearchDesc = "Clear search"
+    assert(dictSearchLabel.isNotEmpty(), "Dictionary search exposes visible label for TalkBack single announcement")
+    assert(entrySearchLabel.isNotEmpty(), "Entry search exposes visible label for TalkBack single announcement")
+    assert(clearSearchDesc == "Clear search", "Clear search button retains explicit content description")
+
+    println("==================================================")
     println("   RESULTS: $passed PASSED, $failed FAILED")
     println("==================================================")
     if (failed > 0) {

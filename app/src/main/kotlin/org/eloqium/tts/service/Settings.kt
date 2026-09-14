@@ -40,8 +40,10 @@ object SettingsDefaults {
     const val KEY_RESPECT_APP_VOICE = "respect_app_voice"
     const val KEY_USER_DICTIONARY_ENABLED = "user_dictionary_enabled"
     const val KEY_USER_DICTIONARIES_DATA = "user_dictionaries_data"
+    const val KEY_ECI_VOICE_TAGS = "eci_voice_tags"
 
     // Defaults
+    const val DEFAULT_ECI_VOICE_TAGS = true
     const val DEFAULT_USER_DICTIONARY_ENABLED = true
     const val DEFAULT_VOICE_PROFILE = 0 // Reed
     const val DEFAULT_FORCE_SPEECH_RATE = false
@@ -237,6 +239,11 @@ class Settings(val prefs: SharedPreferences) {
         get() = prefs.getBoolean(SettingsDefaults.KEY_RESPECT_APP_VOICE, SettingsDefaults.DEFAULT_RESPECT_APP_VOICE)
         set(value) = prefs.edit().putBoolean(SettingsDefaults.KEY_RESPECT_APP_VOICE, value).apply()
 
+    // ECI Voice Tags (in-text backquote voice and control annotations)
+    var eciVoiceTagsEnabled: Boolean
+        get() = prefs.getBoolean(SettingsDefaults.KEY_ECI_VOICE_TAGS, SettingsDefaults.DEFAULT_ECI_VOICE_TAGS)
+        set(value) = prefs.edit().putBoolean(SettingsDefaults.KEY_ECI_VOICE_TAGS, value).apply()
+
     // User Dictionary
     val userDictionaryRepository = UserDictionaryRepository(prefs)
 
@@ -272,6 +279,7 @@ class Settings(val prefs: SharedPreferences) {
             .putInt(SettingsDefaults.KEY_SAMPLING_RATE, SettingsDefaults.DEFAULT_SAMPLING_RATE)
             .putBoolean(SettingsDefaults.KEY_PHRASE_PREDICTION, SettingsDefaults.DEFAULT_PHRASE_PREDICTION)
             .putBoolean(SettingsDefaults.KEY_RESPECT_APP_VOICE, SettingsDefaults.DEFAULT_RESPECT_APP_VOICE)
+            .putBoolean(SettingsDefaults.KEY_ECI_VOICE_TAGS, SettingsDefaults.DEFAULT_ECI_VOICE_TAGS)
             .putBoolean(SettingsDefaults.KEY_USER_DICTIONARY_ENABLED, SettingsDefaults.DEFAULT_USER_DICTIONARY_ENABLED)
             .apply()
     }

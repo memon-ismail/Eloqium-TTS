@@ -8,6 +8,7 @@ import org.eloqium.tts.service.SettingsDefaults
 object NumberProcessor {
 
     private val NUMBER_REGEX = Regex("""\d+""")
+    private val PHONETIC_TAG_REGEX = Regex("""`\[[^\]\r\n\t]+\]""")
 
     fun process(
         text: String,
@@ -16,10 +17,32 @@ object NumberProcessor {
     ): String {
         if (!enabled || text.isEmpty()) return text
 
-        return NUMBER_REGEX.replace(text) { match ->
-            val num = match.value
-            formatNumber(num, mode)
+        if (!text.contains("`[")) {
+            return NUMBER_REGEX.replace(text) { match ->
+                val num = match.value
+                formatNumber(num, mode)
+            }
         }
+
+        val sb = StringBuilder(text.length + 16)
+        var cursor = 0
+        for (match in PHONETIC_TAG_REGEX.findAll(text)) {
+            val start = match.range.first
+            val end = match.range.last + 1
+            if (start > cursor) {
+                sb.append(NUMBER_REGEX.replace(text.substring(cursor, start)) { m ->
+                    formatNumber(m.value, mode)
+                })
+            }
+            sb.append(match.value)
+            cursor = end
+        }
+        if (cursor < text.length) {
+            sb.append(NUMBER_REGEX.replace(text.substring(cursor)) { m ->
+                formatNumber(m.value, mode)
+            })
+        }
+        return sb.toString()
     }
 
     fun formatNumber(digits: String, mode: Int): String {

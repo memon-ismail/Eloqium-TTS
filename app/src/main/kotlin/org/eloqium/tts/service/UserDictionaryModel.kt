@@ -26,6 +26,24 @@ enum class MatchMode(val displayName: String) {
 }
 
 /**
+ * Entry type: text replacement vs. OpenEVV phonetic SPR pronunciation.
+ */
+enum class DictionaryEntryType {
+    TEXT,
+    PRONUNCIATION;
+
+    companion object {
+        fun fromString(value: String?): DictionaryEntryType {
+            if (value == null) return TEXT
+            val trimmed = value.trim()
+            return entries.firstOrNull {
+                it.name.equals(trimmed, ignoreCase = true)
+            } ?: TEXT
+        }
+    }
+}
+
+/**
  * Individual word or phrase replacement entry.
  */
 data class UserDictionaryEntry(
@@ -33,7 +51,20 @@ data class UserDictionaryEntry(
     val source: String,
     val replacement: String,
     val matchMode: MatchMode = MatchMode.EXACT,
-    val caseSensitive: Boolean = false
+    val caseSensitive: Boolean = false,
+    val type: DictionaryEntryType = DictionaryEntryType.TEXT
+)
+
+/**
+ * Provenance tracking origin and metadata for imported dictionaries.
+ */
+data class DictionaryProvenance(
+    val format: String = "json",
+    val originalFilename: String? = null,
+    val sourceLanguage: String? = null,
+    val targetLocale: String? = null,
+    val dictionaryLayer: String? = null,
+    val importDate: Long = System.currentTimeMillis()
 )
 
 /**
@@ -43,7 +74,8 @@ data class UserDictionary(
     val id: String = UUID.randomUUID().toString(),
     val name: String = "User Dictionary",
     val enabled: Boolean = true,
-    val entries: List<UserDictionaryEntry> = emptyList()
+    val entries: List<UserDictionaryEntry> = emptyList(),
+    val provenance: DictionaryProvenance? = null
 )
 
 /**
@@ -58,7 +90,7 @@ data class LanguageDictionaries(
  * Complete root data model for the User Dictionary subsystem.
  */
 data class UserDictionarySystem(
-    val schemaVersion: Int = 1,
+    val schemaVersion: Int = 2,
     val languages: List<LanguageDictionaries> = emptyList()
 )
 
@@ -77,7 +109,7 @@ data class ParsedDictionary(
  */
 object UserDictionaryJson {
 
-    const val CURRENT_SCHEMA_VERSION = 1
+    const val CURRENT_SCHEMA_VERSION = 2
 
     fun exportDictionary(dict: UserDictionary, languageTag: String): String {
         val sb = StringBuilder()
@@ -86,13 +118,24 @@ object UserDictionaryJson {
         sb.append("  \"language\": \"").append(escape(languageTag)).append("\",\n")
         sb.append("  \"name\": \"").append(escape(dict.name)).append("\",\n")
         sb.append("  \"enabled\": ").append(dict.enabled).append(",\n")
+        dict.provenance?.let { prov ->
+            sb.append("  \"provenance\": {\n")
+            sb.append("    \"format\": \"").append(escape(prov.format)).append("\",\n")
+            prov.originalFilename?.let { sb.append("    \"originalFilename\": \"").append(escape(it)).append("\",\n") }
+            prov.sourceLanguage?.let { sb.append("    \"sourceLanguage\": \"").append(escape(it)).append("\",\n") }
+            prov.targetLocale?.let { sb.append("    \"targetLocale\": \"").append(escape(it)).append("\",\n") }
+            prov.dictionaryLayer?.let { sb.append("    \"dictionaryLayer\": \"").append(escape(it)).append("\",\n") }
+            sb.append("    \"importDate\": ").append(prov.importDate).append("\n")
+            sb.append("  },\n")
+        }
         sb.append("  \"entries\": [\n")
         dict.entries.forEachIndexed { index, entry ->
             sb.append("    {\n")
             sb.append("      \"source\": \"").append(escape(entry.source)).append("\",\n")
             sb.append("      \"replacement\": \"").append(escape(entry.replacement)).append("\",\n")
             sb.append("      \"matchMode\": \"").append(escape(entry.matchMode.displayName)).append("\",\n")
-            sb.append("      \"caseSensitive\": ").append(entry.caseSensitive).append("\n")
+            sb.append("      \"caseSensitive\": ").append(entry.caseSensitive).append(",\n")
+            sb.append("      \"type\": \"").append(entry.type.name.lowercase()).append("\"\n")
             sb.append("    }")
             if (index < dict.entries.size - 1) sb.append(",")
             sb.append("\n")
@@ -105,7 +148,7 @@ object UserDictionaryJson {
     fun exportSystem(system: UserDictionarySystem): String {
         val sb = StringBuilder()
         sb.append("{\n")
-        sb.append("  \"schemaVersion\": ").append(system.schemaVersion).append(",\n")
+        sb.append("  \"schemaVersion\": ").append(CURRENT_SCHEMA_VERSION).append(",\n")
         sb.append("  \"languages\": [\n")
         system.languages.forEachIndexed { lIdx, lang ->
             sb.append("    {\n")
@@ -116,6 +159,16 @@ object UserDictionaryJson {
                 sb.append("          \"id\": \"").append(escape(dict.id)).append("\",\n")
                 sb.append("          \"name\": \"").append(escape(dict.name)).append("\",\n")
                 sb.append("          \"enabled\": ").append(dict.enabled).append(",\n")
+                dict.provenance?.let { prov ->
+                    sb.append("          \"provenance\": {\n")
+                    sb.append("            \"format\": \"").append(escape(prov.format)).append("\",\n")
+                    prov.originalFilename?.let { sb.append("            \"originalFilename\": \"").append(escape(it)).append("\",\n") }
+                    prov.sourceLanguage?.let { sb.append("            \"sourceLanguage\": \"").append(escape(it)).append("\",\n") }
+                    prov.targetLocale?.let { sb.append("            \"targetLocale\": \"").append(escape(it)).append("\",\n") }
+                    prov.dictionaryLayer?.let { sb.append("            \"dictionaryLayer\": \"").append(escape(it)).append("\",\n") }
+                    sb.append("            \"importDate\": ").append(prov.importDate).append("\n")
+                    sb.append("          },\n")
+                }
                 sb.append("          \"entries\": [\n")
                 dict.entries.forEachIndexed { eIdx, entry ->
                     sb.append("            {\n")
@@ -123,7 +176,8 @@ object UserDictionaryJson {
                     sb.append("              \"source\": \"").append(escape(entry.source)).append("\",\n")
                     sb.append("              \"replacement\": \"").append(escape(entry.replacement)).append("\",\n")
                     sb.append("              \"matchMode\": \"").append(escape(entry.matchMode.displayName)).append("\",\n")
-                    sb.append("              \"caseSensitive\": ").append(entry.caseSensitive).append("\n")
+                    sb.append("              \"caseSensitive\": ").append(entry.caseSensitive).append(",\n")
+                    sb.append("              \"type\": \"").append(entry.type.name.lowercase()).append("\"\n")
                     sb.append("            }")
                     if (eIdx < dict.entries.size - 1) sb.append(",")
                     sb.append("\n")
@@ -156,9 +210,9 @@ object UserDictionaryJson {
                 else -> null
             } ?: return Result.failure(IllegalArgumentException("Invalid schemaVersion: expected integer"))
 
-            if (schemaVersion != CURRENT_SCHEMA_VERSION) {
+            if (schemaVersion < 1 || schemaVersion > CURRENT_SCHEMA_VERSION) {
                 return Result.failure(IllegalArgumentException(
-                    "Unsupported schema version: $schemaVersion (supported: $CURRENT_SCHEMA_VERSION)"
+                    "Unsupported schema version: $schemaVersion (supported: 1..$CURRENT_SCHEMA_VERSION)"
                 ))
             }
 
@@ -170,6 +224,18 @@ object UserDictionaryJson {
             val name = root["name"]?.toString()?.trim().takeUnless { it.isNullOrEmpty() } ?: "Imported Dictionary"
             val enabled = root["enabled"] as? Boolean ?: true
 
+            val provMap = root["provenance"] as? Map<*, *>
+            val provenance = if (provMap != null) {
+                DictionaryProvenance(
+                    format = provMap["format"]?.toString() ?: "json",
+                    originalFilename = provMap["originalFilename"]?.toString(),
+                    sourceLanguage = provMap["sourceLanguage"]?.toString(),
+                    targetLocale = provMap["targetLocale"]?.toString(),
+                    dictionaryLayer = provMap["dictionaryLayer"]?.toString(),
+                    importDate = (provMap["importDate"] as? Number)?.toLong() ?: System.currentTimeMillis()
+                )
+            } else null
+
             val entriesList = mutableListOf<UserDictionaryEntry>()
             val rawEntries = root["entries"] as? List<*>
             if (rawEntries != null) {
@@ -180,6 +246,7 @@ object UserDictionaryJson {
                     val replacement = entryMap["replacement"]?.toString() ?: ""
                     val matchMode = MatchMode.fromString(entryMap["matchMode"]?.toString())
                     val caseSensitive = entryMap["caseSensitive"] as? Boolean ?: false
+                    val type = DictionaryEntryType.fromString(entryMap["type"]?.toString())
 
                     entriesList.add(
                         UserDictionaryEntry(
@@ -187,7 +254,8 @@ object UserDictionaryJson {
                             source = source,
                             replacement = replacement,
                             matchMode = matchMode,
-                            caseSensitive = caseSensitive
+                            caseSensitive = caseSensitive,
+                            type = type
                         )
                     )
                 }
@@ -197,7 +265,8 @@ object UserDictionaryJson {
                 id = root["id"]?.toString() ?: UUID.randomUUID().toString(),
                 name = name,
                 enabled = enabled,
-                entries = entriesList
+                entries = entriesList,
+                provenance = provenance
             )
 
             Result.success(ParsedDictionary(schemaVersion, language, dict))
@@ -228,6 +297,18 @@ object UserDictionaryJson {
                         val enabled = dictMap["enabled"] as? Boolean ?: true
                         val id = dictMap["id"]?.toString() ?: UUID.randomUUID().toString()
 
+                        val provMap = dictMap["provenance"] as? Map<*, *>
+                        val provenance = if (provMap != null) {
+                            DictionaryProvenance(
+                                format = provMap["format"]?.toString() ?: "json",
+                                originalFilename = provMap["originalFilename"]?.toString(),
+                                sourceLanguage = provMap["sourceLanguage"]?.toString(),
+                                targetLocale = provMap["targetLocale"]?.toString(),
+                                dictionaryLayer = provMap["dictionaryLayer"]?.toString(),
+                                importDate = (provMap["importDate"] as? Number)?.toLong() ?: System.currentTimeMillis()
+                            )
+                        } else null
+
                         val entries = mutableListOf<UserDictionaryEntry>()
                         val rawEntries = dictMap["entries"] as? List<*>
                         if (rawEntries != null) {
@@ -239,6 +320,7 @@ object UserDictionaryJson {
                                 val matchMode = MatchMode.fromString(eMap["matchMode"]?.toString())
                                 val caseSensitive = eMap["caseSensitive"] as? Boolean ?: false
                                 val entryId = eMap["id"]?.toString() ?: UUID.randomUUID().toString()
+                                val type = DictionaryEntryType.fromString(eMap["type"]?.toString())
 
                                 entries.add(
                                     UserDictionaryEntry(
@@ -246,13 +328,22 @@ object UserDictionaryJson {
                                         source = source,
                                         replacement = replacement,
                                         matchMode = matchMode,
-                                        caseSensitive = caseSensitive
+                                        caseSensitive = caseSensitive,
+                                        type = type
                                     )
                                 )
                             }
                         }
 
-                        dicts.add(UserDictionary(id = id, name = name, enabled = enabled, entries = entries))
+                        dicts.add(
+                            UserDictionary(
+                                id = id,
+                                name = name,
+                                enabled = enabled,
+                                entries = entries,
+                                provenance = provenance
+                            )
+                        )
                     }
                 }
 

@@ -19,6 +19,7 @@ object Chunker {
      * Determines whether [word] terminates a sentence.
      */
     fun endsSentence(word: String): Boolean {
+        if (word.startsWith("`[") && word.endsWith("]")) return false
         val tail = word.trimEnd { it in CLOSERS }
         if (tail.isEmpty()) return false
         if (tail.last() in ENDERS) return true
@@ -82,9 +83,24 @@ object Chunker {
         val out = ArrayList<String>()
         var at = 0
         while (at < text.length) {
+            // Keep OpenEVV phonetic SPR tags `[...] as atomic runs
+            if (text[at] == '`' && at + 1 < text.length && text[at + 1] == '[') {
+                val closeIdx = text.indexOf(']', at + 2)
+                if (closeIdx != -1 && !text.substring(at, closeIdx).contains('\n')) {
+                    out.add(text.substring(at, closeIdx + 1))
+                    at = closeIdx + 1
+                    continue
+                }
+            }
+
             val from = at
             val isSpace = text[at].isWhitespace()
-            while (at < text.length && text[at].isWhitespace() == isSpace) at++
+            while (at < text.length && text[at].isWhitespace() == isSpace) {
+                if (!isSpace && text[at] == '`' && at + 1 < text.length && text[at + 1] == '[') {
+                    break
+                }
+                at++
+            }
             out.add(text.substring(from, at))
         }
         return out

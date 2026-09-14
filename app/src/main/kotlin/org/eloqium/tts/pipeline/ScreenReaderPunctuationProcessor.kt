@@ -136,6 +136,17 @@ object ScreenReaderPunctuationProcessor {
         val len = boundText.length
 
         while (i < len) {
+            // Protect OpenEVV phonetic annotation spans: `[...]
+            if (boundText[i] == '`' && i + 1 < len && boundText[i + 1] == '[') {
+                val closeBracket = boundText.indexOf(']', i + 2)
+                if (closeBracket != -1 && !boundText.substring(i, closeBracket).contains('\n')) {
+                    // Append verbatim without expanding brackets, dots, or backticks
+                    sb.append(boundText, i, closeBracket + 1)
+                    i = closeBracket + 1
+                    continue
+                }
+            }
+
             // Check if current position matches a decimal or thousands or time
             val sub = boundText.substring(i)
             val decMatch = DECIMAL_REGEX.find(sub)

@@ -54,6 +54,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import org.eloqium.tts.engine.LocaleMatcher
+import org.eloqium.tts.service.DictionaryEntryType
+import org.eloqium.tts.service.IbmDicImporter
 import org.eloqium.tts.service.MatchMode
 import org.eloqium.tts.service.Settings
 import org.eloqium.tts.service.UserDictionary
@@ -282,6 +284,7 @@ fun LanguageDictionariesScreen(
     var contextMenuDict by remember { mutableStateOf<UserDictionary?>(null) }
     var exportTargetDict by remember { mutableStateOf<UserDictionary?>(null) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
+    var searchQuery by remember { mutableStateOf("") }
 
     fun refreshDictionaries() {
         val current = repo.getDictionaries(languageTag)
@@ -297,21 +300,59 @@ fun LanguageDictionariesScreen(
     ) { uri: Uri? ->
         if (uri != null) {
             try {
-                val jsonString = context.contentResolver.openInputStream(uri)?.use { stream ->
-                    stream.bufferedReader(Charsets.UTF_8).readText()
-                }
-                if (jsonString != null) {
-                    val res = repo.importDictionary(languageTag, jsonString)
-                    if (res.isSuccess) {
-                        val imported = res.getOrThrow()
-                        refreshDictionaries()
-                        Toast.makeText(
-                            context,
-                            "Imported '${imported.dictionary.name}' with ${imported.entryCount} entries",
-                            Toast.LENGTH_SHORT
-                        ).show()
+                val bytes = context.contentResolver.openInputStream(uri)?.use { it.readBytes() }
+                if (bytes != null) {
+                    val fileName = getFileName(context, uri) ?: "imported"
+                    if (fileName.endsWith(".dic", ignoreCase = true)) {
+                        val parseResult = IbmDicImporter.parse(bytes, fileName, languageTag)
+                        if (parseResult.isSuccess) {
+                            val parsed = parseResult.getOrThrow()
+                            val res = repo.importParsedDictionary(languageTag, parsed.dictionary)
+                            if (res.isSuccess) {
+                                refreshDictionaries()
+                                Toast.makeText(
+                                    context,
+                                    "Imported '${parsed.dictionary.name}' (${parsed.dictionary.entries.size} entries)",
+                                    Toast.LENGTH_SHORT
+                                ).show()
+                            } else {
+                                errorMessage = "Import failed: ${res.exceptionOrNull()?.message}"
+                            }
+                        } else {
+                            errorMessage = "Failed to parse IBM .dic: ${parseResult.exceptionOrNull()?.message}"
+                        }
                     } else {
-                        errorMessage = "Import failed: ${res.exceptionOrNull()?.message ?: "Invalid JSON format"}"
+                        // Try JSON parsing first
+                        val jsonString = String(bytes, Charsets.UTF_8)
+                        val res = repo.importDictionary(languageTag, jsonString)
+                        if (res.isSuccess) {
+                            val imported = res.getOrThrow()
+                            refreshDictionaries()
+                            Toast.makeText(
+                                context,
+                                "Imported '${imported.dictionary.name}' with ${imported.entryCount} entries",
+                                Toast.LENGTH_SHORT
+                            ).show()
+                        } else {
+                            // If JSON failed, try as .dic
+                            val dicRes = IbmDicImporter.parse(bytes, fileName, languageTag)
+                            if (dicRes.isSuccess && dicRes.getOrThrow().dictionary.entries.isNotEmpty()) {
+                                val parsed = dicRes.getOrThrow()
+                                val saveRes = repo.importParsedDictionary(languageTag, parsed.dictionary)
+                                if (saveRes.isSuccess) {
+                                    refreshDictionaries()
+                                    Toast.makeText(
+                                        context,
+                                        "Imported '${parsed.dictionary.name}' (${parsed.dictionary.entries.size} entries)",
+                                        Toast.LENGTH_SHORT
+                                    ).show()
+                                } else {
+                                    errorMessage = "Import failed: ${saveRes.exceptionOrNull()?.message}"
+                                }
+                            } else {
+                                errorMessage = "Import failed: ${res.exceptionOrNull()?.message ?: "Invalid dictionary format"}"
+                            }
+                        }
                     }
                 } else {
                     errorMessage = "Failed to read file from storage"
@@ -407,6 +448,46 @@ fun LanguageDictionariesScreen(
                 }
             }
 
+            val trimmedSearch = searchQuery.trim()
+            val filteredDictionaries = if (trimmedSearch.isEmpty()) {
+                dictionaries
+            } else {
+                dictionaries.filter { dict ->
+                    dict.name.contains(trimmedSearch, ignoreCase = true) ||
+                    dict.provenance?.originalFilename?.contains(trimmedSearch, ignoreCase = true) == true ||
+                    dict.provenance?.sourceLanguage?.contains(trimmedSearch, ignoreCase = true) == true ||
+                    dict.provenance?.dictionaryLayer?.contains(trimmedSearch, ignoreCase = true) == true
+                }
+            }
+
+            // Search filter field
+            if (dictionaries.size > 1 || searchQuery.isNotBlank()) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 6.dp)
+                ) {
+                    OutlinedTextField(
+                        value = searchQuery,
+                        onValueChange = { searchQuery = it },
+                        label = { Text("Search dictionaries") },
+                        placeholder = { Text("Filter by name or filename") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth(),
+                        trailingIcon = {
+                            if (searchQuery.isNotEmpty()) {
+                                IconButton(
+                                    onClick = { searchQuery = "" },
+                                    modifier = Modifier.semantics { contentDescription = "Clear search" }
+                                ) {
+                                    Text("✕", style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Bold)
+                                }
+                            }
+                        }
+                    )
+                }
+            }
+
             HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
 
             LazyColumn(
@@ -415,46 +496,81 @@ fun LanguageDictionariesScreen(
                     .weight(1f)
             ) {
                 item {
-                    PaddingHeader(title = "Dictionaries (${dictionaries.size})")
+                    val headerTitle = if (trimmedSearch.isEmpty()) {
+                        "Dictionaries (${dictionaries.size})"
+                    } else {
+                        "Search Results (${filteredDictionaries.size} of ${dictionaries.size})"
+                    }
+                    PaddingHeader(title = headerTitle)
                 }
 
-                items(dictionaries) { dict ->
-                    val statusText = if (dict.enabled) "Enabled" else "Disabled"
-                    val entryCountText = if (dict.entries.size == 1) "1 entry" else "${dict.entries.size} entries"
+                if (filteredDictionaries.isEmpty()) {
+                    item {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(32.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                Text(
+                                    text = "No dictionaries match '$trimmedSearch'",
+                                    style = MaterialTheme.typography.bodyLarge,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    textAlign = TextAlign.Center
+                                )
+                                Spacer(modifier = Modifier.height(12.dp))
+                                TextButton(onClick = { searchQuery = "" }) {
+                                    Text("Clear search")
+                                }
+                            }
+                        }
+                    }
+                } else {
+                    items(filteredDictionaries) { dict ->
+                        val statusText = if (dict.enabled) "Enabled" else "Disabled"
+                        val entryCountText = if (dict.entries.size == 1) "1 entry" else "${dict.entries.size} entries"
+                        val provenanceInfo = dict.provenance?.let { p ->
+                            val parts = mutableListOf<String>()
+                            p.originalFilename?.let { parts.add(it) }
+                            p.sourceLanguage?.let { parts.add(it) }
+                            if (parts.isNotEmpty()) " (${parts.joinToString(", ")})" else ""
+                        } ?: ""
 
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .combinedClickable(
-                                onClick = { onOpenDictionary(dict.id) },
-                                onLongClick = { contextMenuDict = dict }
-                            )
-                            .padding(horizontal = 20.dp, vertical = 14.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Column(modifier = Modifier.weight(1f)) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .combinedClickable(
+                                    onClick = { onOpenDictionary(dict.id) },
+                                    onLongClick = { contextMenuDict = dict }
+                                )
+                                .padding(horizontal = 20.dp, vertical = 14.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = dict.name,
+                                    style = MaterialTheme.typography.bodyLarge,
+                                    fontWeight = FontWeight.Medium
+                                )
+                                Spacer(modifier = Modifier.height(2.dp))
+                                Text(
+                                    text = "$statusText • $entryCountText$provenanceInfo",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = if (dict.enabled) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.error
+                                )
+                            }
                             Text(
-                                text = dict.name,
-                                style = MaterialTheme.typography.bodyLarge,
-                                fontWeight = FontWeight.Medium
-                            )
-                            Spacer(modifier = Modifier.height(2.dp))
-                            Text(
-                                text = "$statusText • $entryCountText",
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = if (dict.enabled) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.error
+                                text = "›",
+                                style = MaterialTheme.typography.titleLarge,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
-                        Text(
-                            text = "›",
-                            style = MaterialTheme.typography.titleLarge,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        HorizontalDivider(
+                            modifier = Modifier.padding(horizontal = 20.dp),
+                            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)
                         )
                     }
-                    HorizontalDivider(
-                        modifier = Modifier.padding(horizontal = 20.dp),
-                        color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)
-                    )
                 }
             }
         }
@@ -677,11 +793,26 @@ fun DictionaryEntriesScreen(
     val repo = settings.userDictionaryRepository
     var dict by remember { mutableStateOf(repo.getDictionary(languageTag, dictionaryId)) }
     var entries by remember { mutableStateOf(repo.getEntries(languageTag, dictionaryId)) }
+    var searchQuery by remember { mutableStateOf("") }
 
     // Dialog states
     var showAddWordDialog by remember { mutableStateOf(false) }
     var editTargetEntry by remember { mutableStateOf<UserDictionaryEntry?>(null) }
     var deleteTargetEntry by remember { mutableStateOf<UserDictionaryEntry?>(null) }
+
+    val trimmedSearch = searchQuery.trim()
+    val filteredEntries = remember(entries, trimmedSearch) {
+        if (trimmedSearch.isEmpty()) {
+            entries
+        } else {
+            entries.filter { entry ->
+                entry.source.contains(trimmedSearch, ignoreCase = true) ||
+                entry.replacement.contains(trimmedSearch, ignoreCase = true) ||
+                (if (entry.type == DictionaryEntryType.PRONUNCIATION) "pronunciation" else "text").contains(trimmedSearch, ignoreCase = true) ||
+                entry.matchMode.displayName.contains(trimmedSearch, ignoreCase = true)
+            }
+        }
+    }
 
     fun refreshEntries() {
         val currentDict = repo.getDictionary(languageTag, dictionaryId)
@@ -748,6 +879,33 @@ fun DictionaryEntriesScreen(
                 }
             }
 
+            if (entries.isNotEmpty()) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 4.dp)
+                ) {
+                    OutlinedTextField(
+                        value = searchQuery,
+                        onValueChange = { searchQuery = it },
+                        label = { Text("Search words") },
+                        placeholder = { Text("Filter by word, replacement, or type") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth(),
+                        trailingIcon = {
+                            if (searchQuery.isNotEmpty()) {
+                                IconButton(
+                                    onClick = { searchQuery = "" },
+                                    modifier = Modifier.semantics { contentDescription = "Clear search" }
+                                ) {
+                                    Text("✕", style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Bold)
+                                }
+                            }
+                        }
+                    )
+                }
+            }
+
             HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
 
             if (entries.isEmpty()) {
@@ -771,48 +929,84 @@ fun DictionaryEntriesScreen(
                         .weight(1f)
                 ) {
                     item {
-                        PaddingHeader(title = "Words and Replacements (${entries.size})")
+                        val headerTitle = if (trimmedSearch.isEmpty()) {
+                            "Words and Replacements (${entries.size})"
+                        } else {
+                            "Search Results (${filteredEntries.size} of ${entries.size})"
+                        }
+                        PaddingHeader(title = headerTitle)
                     }
 
-                    items(entries) { entry ->
-                        val caseLabel = if (entry.caseSensitive) "Case-sensitive" else "Case-insensitive"
-                        val matchModeLabel = entry.matchMode.displayName
-
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clickable { editTargetEntry = entry }
-                                .padding(horizontal = 20.dp, vertical = 12.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(
-                                    text = "${entry.source} → ${entry.replacement}",
-                                    style = MaterialTheme.typography.bodyLarge,
-                                    fontWeight = FontWeight.Medium
-                                )
-                                Spacer(modifier = Modifier.height(2.dp))
-                                Text(
-                                    text = "$matchModeLabel • $caseLabel",
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                            }
-                            IconButton(
-                                onClick = { deleteTargetEntry = entry },
-                                modifier = Modifier.semantics { contentDescription = "Delete entry" }
+                    if (filteredEntries.isEmpty()) {
+                        item {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(32.dp),
+                                contentAlignment = Alignment.Center
                             ) {
-                                Text(
-                                    text = "✕",
-                                    style = MaterialTheme.typography.bodyLarge,
-                                    color = MaterialTheme.colorScheme.error
-                                )
+                                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                    Text(
+                                        text = "No words match '$trimmedSearch'",
+                                        style = MaterialTheme.typography.bodyLarge,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        textAlign = TextAlign.Center
+                                    )
+                                    Spacer(modifier = Modifier.height(12.dp))
+                                    TextButton(onClick = { searchQuery = "" }) {
+                                        Text("Clear search")
+                                    }
+                                }
                             }
                         }
-                        HorizontalDivider(
-                            modifier = Modifier.padding(horizontal = 20.dp),
-                            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)
-                        )
+                    } else {
+                        items(filteredEntries) { entry ->
+                            val typeLabel = if (entry.type == DictionaryEntryType.PRONUNCIATION) "Pronunciation" else "Text"
+                            val caseLabel = if (entry.caseSensitive) "Case-sensitive" else "Case-insensitive"
+                            val matchModeLabel = entry.matchMode.displayName
+                            val displayReplacement = if (entry.type == DictionaryEntryType.PRONUNCIATION) {
+                                val clean = entry.replacement.removePrefix("`").removePrefix("[").removeSuffix(".").removeSuffix("]").trim()
+                                "[$clean]"
+                            } else {
+                                entry.replacement
+                            }
+
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable { editTargetEntry = entry }
+                                    .padding(horizontal = 20.dp, vertical = 12.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        text = "${entry.source} → $displayReplacement",
+                                        style = MaterialTheme.typography.bodyLarge,
+                                        fontWeight = FontWeight.Medium
+                                    )
+                                    Spacer(modifier = Modifier.height(2.dp))
+                                    Text(
+                                        text = "$typeLabel • $matchModeLabel • $caseLabel",
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                                IconButton(
+                                    onClick = { deleteTargetEntry = entry },
+                                    modifier = Modifier.semantics { contentDescription = "Delete entry" }
+                                ) {
+                                    Text(
+                                        text = "✕",
+                                        style = MaterialTheme.typography.bodyLarge,
+                                        color = MaterialTheme.colorScheme.error
+                                    )
+                                }
+                            }
+                            HorizontalDivider(
+                                modifier = Modifier.padding(horizontal = 20.dp),
+                                color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)
+                            )
+                        }
                     }
                 }
             }
@@ -827,8 +1021,9 @@ fun DictionaryEntriesScreen(
             initialReplacement = "",
             initialMatchMode = MatchMode.EXACT,
             initialCaseSensitive = false,
+            initialType = DictionaryEntryType.TEXT,
             confirmButtonLabel = "Add Word",
-            onConfirm = { src, repl, mode, caseSens ->
+            onConfirm = { src, repl, mode, caseSens, type ->
                 repo.addEntry(
                     languageTag,
                     dictionaryId,
@@ -836,7 +1031,8 @@ fun DictionaryEntriesScreen(
                         source = src,
                         replacement = repl,
                         matchMode = mode,
-                        caseSensitive = caseSens
+                        caseSensitive = caseSens,
+                        type = type
                     )
                 )
                 refreshEntries()
@@ -855,8 +1051,9 @@ fun DictionaryEntriesScreen(
             initialReplacement = entry.replacement,
             initialMatchMode = entry.matchMode,
             initialCaseSensitive = entry.caseSensitive,
+            initialType = entry.type,
             confirmButtonLabel = "Save",
-            onConfirm = { src, repl, mode, caseSens ->
+            onConfirm = { src, repl, mode, caseSens, type ->
                 repo.updateEntry(
                     languageTag,
                     dictionaryId,
@@ -864,7 +1061,8 @@ fun DictionaryEntriesScreen(
                         source = src,
                         replacement = repl,
                         matchMode = mode,
-                        caseSensitive = caseSens
+                        caseSensitive = caseSens,
+                        type = type
                     )
                 )
                 refreshEntries()
@@ -912,14 +1110,16 @@ fun WordEntryDialog(
     initialReplacement: String,
     initialMatchMode: MatchMode,
     initialCaseSensitive: Boolean,
+    initialType: DictionaryEntryType = DictionaryEntryType.TEXT,
     confirmButtonLabel: String,
-    onConfirm: (source: String, replacement: String, mode: MatchMode, caseSensitive: Boolean) -> Unit,
+    onConfirm: (source: String, replacement: String, mode: MatchMode, caseSensitive: Boolean, type: DictionaryEntryType) -> Unit,
     onDismiss: () -> Unit
 ) {
     var sourceText by remember { mutableStateOf(initialSource) }
     var replacementText by remember { mutableStateOf(initialReplacement) }
     var selectedMode by remember { mutableStateOf(initialMatchMode) }
     var caseSensitive by remember { mutableStateOf(initialCaseSensitive) }
+    var selectedType by remember { mutableStateOf(initialType) }
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -928,7 +1128,7 @@ fun WordEntryDialog(
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .heightIn(max = 420.dp)
+                    .heightIn(max = 480.dp)
             ) {
                 // 1. Source text
                 OutlinedTextField(
@@ -941,11 +1141,63 @@ fun WordEntryDialog(
 
                 Spacer(modifier = Modifier.height(12.dp))
 
-                // 2. Replacement text
+                // 2. Entry Type Selection: Text vs Pronunciation (SPR)
+                Text(
+                    text = "Entry type",
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.Bold
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .selectable(
+                                selected = (selectedType == DictionaryEntryType.TEXT),
+                                onClick = { selectedType = DictionaryEntryType.TEXT },
+                                role = Role.RadioButton
+                            ),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        RadioButton(selected = (selectedType == DictionaryEntryType.TEXT), onClick = null)
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(text = "Text", style = MaterialTheme.typography.bodyLarge)
+                    }
+                    Row(
+                        modifier = Modifier
+                            .selectable(
+                                selected = (selectedType == DictionaryEntryType.PRONUNCIATION),
+                                onClick = { selectedType = DictionaryEntryType.PRONUNCIATION },
+                                role = Role.RadioButton
+                            ),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        RadioButton(selected = (selectedType == DictionaryEntryType.PRONUNCIATION), onClick = null)
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(text = "Pronunciation (SPR)", style = MaterialTheme.typography.bodyLarge)
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                // 3. Replacement text / Pronunciation SPR
                 OutlinedTextField(
                     value = replacementText,
                     onValueChange = { replacementText = it },
-                    label = { Text("Replacement text") },
+                    label = {
+                        Text(
+                            if (selectedType == DictionaryEntryType.PRONUNCIATION) "Pronunciation (SPR)"
+                            else "Replacement text"
+                        )
+                    },
+                    supportingText = {
+                        Text(
+                            if (selectedType == DictionaryEntryType.PRONUNCIATION) "e.g. s.1mIl.k2wItS (brackets optional, no backtick)"
+                            else "e.g. spoken word or expanded phrase"
+                        )
+                    },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth()
                 )
@@ -960,7 +1212,7 @@ fun WordEntryDialog(
 
                 Spacer(modifier = Modifier.height(4.dp))
 
-                // 3. Match mode choices: EXACT, STARTS_WITH, ENDS_WITH, CONTAINS
+                // 4. Match mode choices: EXACT, STARTS_WITH, ENDS_WITH, CONTAINS
                 MatchMode.ALL_MODES.forEach { mode ->
                     Row(
                         modifier = Modifier
@@ -970,7 +1222,7 @@ fun WordEntryDialog(
                                 onClick = { selectedMode = mode },
                                 role = Role.RadioButton
                             )
-                            .padding(vertical = 6.dp),
+                            .padding(vertical = 4.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         RadioButton(
@@ -982,9 +1234,9 @@ fun WordEntryDialog(
                     }
                 }
 
-                Spacer(modifier = Modifier.height(8.dp))
+                Spacer(modifier = Modifier.height(6.dp))
 
-                // 4. Case sensitivity checkbox
+                // 5. Case sensitivity checkbox
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -993,7 +1245,7 @@ fun WordEntryDialog(
                             onValueChange = { caseSensitive = it },
                             role = Role.Checkbox
                         )
-                        .padding(vertical = 6.dp),
+                        .padding(vertical = 4.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Checkbox(
@@ -1009,7 +1261,7 @@ fun WordEntryDialog(
             TextButton(
                 enabled = sourceText.trim().isNotEmpty(),
                 onClick = {
-                    onConfirm(sourceText.trim(), replacementText, selectedMode, caseSensitive)
+                    onConfirm(sourceText.trim(), replacementText.trim(), selectedMode, caseSensitive, selectedType)
                 }
             ) {
                 Text(confirmButtonLabel)
@@ -1054,4 +1306,28 @@ private fun PaddingHeader(title: String) {
             .padding(horizontal = 20.dp, vertical = 10.dp)
             .semantics { heading() }
     )
+}
+
+private fun getFileName(context: Context, uri: Uri): String? {
+    var name: String? = null
+    if (uri.scheme == "content") {
+        try {
+            val cursor = context.contentResolver.query(uri, null, null, null, null)
+            cursor?.use {
+                if (it.moveToFirst()) {
+                    val index = it.getColumnIndex(android.provider.OpenableColumns.DISPLAY_NAME)
+                    if (index != -1) {
+                        name = it.getString(index)
+                    }
+                }
+            }
+        } catch (_: Throwable) {}
+    }
+    if (name == null) {
+        name = uri.path?.let { p ->
+            val cut = p.lastIndexOf('/')
+            if (cut != -1) p.substring(cut + 1) else p
+        }
+    }
+    return name
 }

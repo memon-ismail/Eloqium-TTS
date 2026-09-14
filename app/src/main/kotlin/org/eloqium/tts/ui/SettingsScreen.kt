@@ -83,6 +83,7 @@ fun SettingsScreen(
 
     var forceVolume by remember { mutableStateOf(settings.forceVolume) }
     var volume by remember { mutableIntStateOf(settings.volume) }
+    var eciVoiceTagsEnabled by remember { mutableStateOf(settings.eciVoiceTagsEnabled) }
 
     var inflection by remember { mutableIntStateOf(settings.inflection) }
     var headSize by remember { mutableIntStateOf(settings.headSize) }
@@ -145,6 +146,7 @@ fun SettingsScreen(
         language = settings.language
         samplingRate = settings.samplingRate
         userDictionaryEnabled = settings.userDictionaryEnabled
+        eciVoiceTagsEnabled = settings.eciVoiceTagsEnabled
     }
 
     BackHandler(enabled = (currentSubScreen !is SettingsSubScreen.SETTINGS)) {
@@ -299,6 +301,17 @@ fun SettingsScreen(
                 subtitle = formatRelativeLabel(volume),
                 enabled = forceVolume,
                 onClick = { showVolumeDialog = true }
+            )
+
+            // ECI Voice Tags
+            SettingsSwitchItem(
+                title = "ECI Voice Tags",
+                subtitle = "Allow supported backquote ECI voice/control annotations in incoming text",
+                checked = eciVoiceTagsEnabled,
+                onCheckedChange = {
+                    eciVoiceTagsEnabled = it
+                    settings.eciVoiceTagsEnabled = it
+                }
             )
 
             HorizontalDivider(

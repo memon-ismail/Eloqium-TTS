@@ -1,5 +1,6 @@
 package org.eloqium.tts.pipeline
 
+import org.eloqium.tts.service.DictionaryEntryType
 import org.eloqium.tts.service.MatchMode
 import org.eloqium.tts.service.UserDictionaryEntry
 import org.eloqium.tts.service.UserDictionaryRepository
@@ -13,7 +14,8 @@ data class CompiledEntry(
     val entry: UserDictionaryEntry,
     val regex: Regex,
     val matchModeRank: Int,
-    val order: Int
+    val order: Int,
+    val runtimeReplacement: String = UserDictionaryProcessor.formatRuntimeReplacement(entry)
 )
 
 /**
@@ -24,15 +26,31 @@ data class CompiledEntry(
  * - Single-pass interval replacement: Zero cascading mutations or accidental recursive corruption.
  * - In-memory compiled rule caching: Zero disk I/O on the audio synthesis path.
  * - Robust Unicode word boundary awareness.
+ * - Support for both TEXT replacements and OpenEVV phonetic PRONUNCIATION entries.
+ * - Scalable O(1) indexed word lookup for massive community dictionaries (e.g. 68k+ entries).
  */
 object UserDictionaryProcessor {
 
     private val cache = ConcurrentHashMap<String, CachedRuleSet>()
+    private val WORD_TOKEN_REGEX = Regex("""[\p{L}\p{N}_]+""")
 
     private data class CachedRuleSet(
         val rawEntriesSignature: Int,
         val rules: List<CompiledEntry>
     )
+
+    /**
+     * Formats the replacement string for audio synthesis execution.
+     * PRONUNCIATION entries are formatted as OpenEVV phonetic tags: `[cleanSpr]
+     */
+    fun formatRuntimeReplacement(entry: UserDictionaryEntry): String {
+        if (entry.type != DictionaryEntryType.PRONUNCIATION) {
+            return entry.replacement
+        }
+        val raw = entry.replacement.trim()
+        val clean = raw.removePrefix("`").removePrefix("[").removeSuffix(".").removeSuffix("]").trim()
+        return "`[$clean]"
+    }
 
     /**
      * Target-level matching helper verifying single target compliance.
@@ -83,7 +101,8 @@ object UserDictionaryProcessor {
                 MatchMode.CONTAINS -> 3
             }
 
-            compiled.add(CompiledEntry(entry, regex, rank, index))
+            val runtimeRepl = formatRuntimeReplacement(entry)
+            compiled.add(CompiledEntry(entry, regex, rank, index, runtimeRepl))
         }
 
         // Precedence Strategy:
@@ -113,6 +132,11 @@ object UserDictionaryProcessor {
     fun process(text: String, rules: List<CompiledEntry>): String {
         if (text.isEmpty() || rules.isEmpty()) return text
 
+        // For large rule sets (> 100 entries), use optimized index lookup to prevent audio stutter
+        if (rules.size > 100) {
+            return processOptimized(text, rules)
+        }
+
         data class MatchInterval(
             val start: Int,
             val end: Int,
@@ -138,7 +162,7 @@ object UserDictionaryProcessor {
                 }
 
                 if (!overlaps) {
-                    acceptedIntervals.add(MatchInterval(start, end, rule.entry.replacement))
+                    acceptedIntervals.add(MatchInterval(start, end, rule.runtimeReplacement))
                 }
             }
         }
@@ -146,6 +170,109 @@ object UserDictionaryProcessor {
         if (acceptedIntervals.isEmpty()) return text
 
         // Sort accepted intervals chronologically by text start position
+        acceptedIntervals.sortBy { it.start }
+
+        val sb = StringBuilder(text.length + 32)
+        var cursor = 0
+        for (interval in acceptedIntervals) {
+            if (interval.start > cursor) {
+                sb.append(text, cursor, interval.start)
+            }
+            sb.append(interval.replacement)
+            cursor = interval.end
+        }
+        if (cursor < text.length) {
+            sb.append(text, cursor, text.length)
+        }
+
+        return sb.toString()
+    }
+
+    /**
+     * High-performance processing for large dictionaries (e.g. 68k+ IBM Root dictionaries).
+     * Partitions exact single words into hash maps for O(1) lookup while maintaining identical precedence semantics.
+     */
+    private fun processOptimized(text: String, rules: List<CompiledEntry>): String {
+        val exactCS = HashMap<String, CompiledEntry>(rules.size)
+        val exactCI = HashMap<String, CompiledEntry>()
+        val patternRules = mutableListOf<CompiledEntry>()
+
+        for (rule in rules) {
+            val src = rule.entry.source
+            val isSimpleWord = rule.entry.matchMode == MatchMode.EXACT &&
+                    src.all { Character.isLetterOrDigit(it) || it == '_' }
+            if (isSimpleWord) {
+                if (rule.entry.caseSensitive) {
+                    exactCS.putIfAbsent(src, rule)
+                } else {
+                    exactCI.putIfAbsent(src.lowercase(), rule)
+                }
+            } else {
+                patternRules.add(rule)
+            }
+        }
+
+        data class CandidateMatch(
+            val start: Int,
+            val end: Int,
+            val rule: CompiledEntry
+        )
+
+        val candidates = mutableListOf<CandidateMatch>()
+
+        // 1. Scan pattern rules
+        for (rule in patternRules) {
+            for (m in rule.regex.findAll(text)) {
+                candidates.add(CandidateMatch(m.range.first, m.range.last + 1, rule))
+            }
+        }
+
+        // 2. Scan exact word tokens in text
+        if (exactCS.isNotEmpty() || exactCI.isNotEmpty()) {
+            for (m in WORD_TOKEN_REGEX.findAll(text)) {
+                val tok = m.value
+                val cs = exactCS[tok]
+                if (cs != null) {
+                    candidates.add(CandidateMatch(m.range.first, m.range.last + 1, cs))
+                } else {
+                    val ci = exactCI[tok.lowercase()]
+                    if (ci != null) {
+                        candidates.add(CandidateMatch(m.range.first, m.range.last + 1, ci))
+                    }
+                }
+            }
+        }
+
+        if (candidates.isEmpty()) return text
+
+        candidates.sortWith(Comparator { a, b ->
+            val lenCmp = b.rule.entry.source.length.compareTo(a.rule.entry.source.length)
+            if (lenCmp != 0) return@Comparator lenCmp
+            val rankCmp = a.rule.matchModeRank.compareTo(b.rule.matchModeRank)
+            if (rankCmp != 0) return@Comparator rankCmp
+            val caseCmp = b.rule.entry.caseSensitive.compareTo(a.rule.entry.caseSensitive)
+            if (caseCmp != 0) return@Comparator caseCmp
+            a.rule.order.compareTo(b.rule.order)
+        })
+
+        data class MatchInterval(val start: Int, val end: Int, val replacement: String)
+        val acceptedIntervals = mutableListOf<MatchInterval>()
+
+        for (cand in candidates) {
+            var overlaps = false
+            for (existing in acceptedIntervals) {
+                if (cand.start < existing.end && cand.end > existing.start) {
+                    overlaps = true
+                    break
+                }
+            }
+            if (!overlaps) {
+                acceptedIntervals.add(MatchInterval(cand.start, cand.end, cand.rule.runtimeReplacement))
+            }
+        }
+
+        if (acceptedIntervals.isEmpty()) return text
+
         acceptedIntervals.sortBy { it.start }
 
         val sb = StringBuilder(text.length + 32)

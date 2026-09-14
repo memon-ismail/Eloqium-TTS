@@ -102,11 +102,24 @@
                 <data android:pathSuffix=".JSON" />
             </intent-filter>
             <intent-filter android:label="Eloqium Dictionary Importer">
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="content" />
+                <data android:scheme="file" />
+                <data android:mimeType="*/*" />
+                <data android:pathPattern=".*\\.dic" />
+                <data android:pathPattern=".*\\.DIC" />
+                <data android:pathSuffix=".dic" />
+                <data android:pathSuffix=".DIC" />
+            </intent-filter>
+            <intent-filter android:label="Eloqium Dictionary Importer">
                 <action android:name="android.intent.action.SEND" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <data android:mimeType="application/json" />
                 <data android:mimeType="text/json" />
                 <data android:mimeType="text/x-json" />
+                <data android:mimeType="text/plain" />
             </intent-filter>
         </activity>
 

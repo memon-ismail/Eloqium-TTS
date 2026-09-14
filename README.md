@@ -9,7 +9,7 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/Version-0.1.2-blue.svg" alt="Version 0.1.2" />
+  <img src="https://img.shields.io/badge/Version-0.1.3-blue.svg" alt="Version 0.1.3" />
   <img src="https://img.shields.io/badge/License-Apache_2.0-blue.svg" alt="Apache 2.0 License" />
   <img src="https://img.shields.io/badge/Platform-Android_6.0%2B-green.svg" alt="Android 6.0+" />
   <img src="https://img.shields.io/badge/Architecture-ARM64%20%7C%20ARMv7%20%7C%20x86__64-orange.svg" alt="Architecture" />
@@ -43,7 +43,7 @@
 
 ## About
  
-Eloqium TTS (version 0.1.2) is an independent open-source text-to-speech engine designed for Android screen-reader users and everyday speech output. It provides fast, clear, and highly responsive speech synthesis that works completely offline on your device.
+Eloqium TTS (version 0.1.3) is an independent open-source text-to-speech engine designed for Android screen-reader users and everyday speech output. It provides fast, clear, and highly responsive speech synthesis that works completely offline on your device.
  
 The project was created and is maintained by **Ismail Memon**.
 
@@ -59,13 +59,14 @@ Eloqium pairs an optimized native build of OpenEVV with modern Android accessibi
 
 ## Features
 
-- **64 Distinct Voices**: 8 language dialects with 8 selectable voice presets each (Reed, Shelley, Bobby, Rocko, Glen, Sandy, Grandma, Grandpa).
+- **64 Distinct Voices**: 8 language dialects with 8 selectable voice presets each (Reed, Shelley, Bobby, Rocko, Glen, Sandy, Grandpa, Grandma).
 - **Language and Regional Voice Support**: Native speech models across 5 language families comprising 8 regional variants: US English, UK English, Castilian Spanish, Latin American Spanish, French, Canadian French, German, and Italian.
 - **Speech Rate Control**: Granular relative rate adjustment (-10 to +10) with an optional high-speed mode for advanced screen-reader users.
 - **Pitch and Tone Shaping**: Adjust pitch, inflection, head size, roughness, and breathiness to customize voice personality.
 - **Digital Volume Boost**: Clean PCM audio amplification with built-in clipping protection for noisy environments.
+- **ECI Voice Tags Control**: Granular toggle to control interpretation of inline ECI parameter commands (`vv`, `vb`, `vs`, `vf`, `vh`, `vr`, `vy`, `p`) with rogue backtick sanitization, while preserving dictionary phoneme markers and pause cadences.
 - **Punctuation Controls**: Five selectable punctuation verbosity levels (None, Some, Most, All, Custom) matching screen-reader preferences and user-defined symbol speech.
-- **User Dictionary**: Multi-lingual, language-scoped pronunciation and word replacement dictionaries with 4 match modes (Exact match, Starts with, Ends with, Contains), case-sensitivity controls, JSON import/export, and Android file manager "Open With" integration.
+- **User Dictionary**: Multi-lingual, language-scoped text and phonetic pronunciation dictionaries (OpenEVV SPR phonemes), IBM `.dic` dictionary import with automatic encoding detection, Schema v2 JSON import/export, and real-time two-level search and filtering across dictionaries and words.
 - **Intonation and Pause Controls**: Natural clause boundaries and customizable pause cadences.
 - **Emoji and Emoticon Speech**: Full spoken descriptions for over 3,800 Unicode emojis and common text emoticons.
 - **Number and Abbreviation Processing**: Context-aware expansion for common abbreviations and numbers without unexpected spelling pauses.
@@ -129,6 +130,7 @@ The **Eloqium settings** screen allows you to fine-tune speech parameters:
 - **Pitch**: Raise or lower the base voice pitch.
 - **Volume**: Adjust digital output gain.
 - **Voice Characteristics**: Fine-tune inflection, head size, roughness, and breathiness.
+- **ECI Voice Tags**: Toggle inline ECI voice parameter tag interpretation on/off. When enabled (default), preserves valid ECI parameter commands while preventing digit-splitting and sanitizing rogue backticks. When disabled, converts user backticks to apostrophes to prevent unexpected tag execution while keeping dictionary phoneme tags and pause markers intact.
 - **Punctuation Level**: Select None, Some, Most, All, or Custom:
   - **None**: Pure prosodic phrasing without spoken symbols.
   - **Some**: Verbalizes mathematical and syntax symbols (`*`, `/`, `\`, `#`, `%`, `&`, `+`, `=`, `@`, `^`, `~`, `<`, `>`, `|`, `$`).
@@ -138,7 +140,7 @@ The **Eloqium settings** screen allows you to fine-tune speech parameters:
 - **Emoji and Emoticons**: Toggle spoken announcements for emojis and text smiles.
 - **Number Processing**: Choose between natural numbers and individual digit reading.
 - **Abbreviations**: Enable or disable context-sensitive abbreviation expansion.
-- **User Dictionary**: Toggle global dictionary processing on/off and open the **Dictionary Manager** to configure languages, add custom word replacements, and import/export JSON dictionaries.
+- **User Dictionary**: Toggle global dictionary processing on/off and open the **Dictionary Manager** to configure languages, add custom word replacements (`Text` or OpenEVV SPR `Pronunciation`), import IBM `.dic` files with destination language selection, and search/filter dictionaries and entries.
 - **Audio Sample Rate**: Select 11,025 Hz or 22,050 Hz.
 - **Reset All Settings**: Restore all configuration values to their defaults.
 
@@ -255,7 +257,7 @@ Eloqium relies exclusively on open-source Android Jetpack and Kotlin libraries:
 
 - **Clean-Room Abbreviation Processor**: All abbreviations and disambiguation rules are implemented in Kotlin (`AbbreviationProcessor.kt`) under the Apache 2.0 license.
 - **Proprietary Dictionaries Excluded**: Proprietary binary dictionary formats (`.cfd`, `.dct`, `.jdf`) are intentionally excluded to respect copyright boundaries.
-- **User Dictionary Subsystem**: Eloqium TTS includes an open-format User Dictionary subsystem storing user-defined word and phrase replacements in standard JSON (Version 1). Dictionaries operate locally on device with zero network transmission, supporting language-scoped isolation, four match modes (Exact match, Starts with, Ends with, Contains), case sensitivity, and non-cascading single-pass replacements.
+- **User Dictionary Subsystem**: Eloqium TTS includes an open-format User Dictionary subsystem storing user-defined text replacements and OpenEVV SPR phonetic pronunciation overrides in standard JSON (Schema Version 2). It also supports IBM `.dic` dictionary import with automatic encoding detection and layer classification, language-scoped isolation, four match modes (Exact match, Starts with, Ends with, Contains), case sensitivity, real-time search, and non-cascading single-pass replacements.
 
 ---
 

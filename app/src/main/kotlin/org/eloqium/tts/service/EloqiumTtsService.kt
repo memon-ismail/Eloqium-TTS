@@ -390,7 +390,7 @@ class EloqiumTtsService : TextToSpeechService() {
             )
 
             // Pipeline step 7: OpenEVV fixes & Chunking
-            val fixed = OpenEVVCompatibilityFixes.apply(punctuated)
+            val fixed = OpenEVVCompatibilityFixes.apply(punctuated, settings.eciVoiceTagsEnabled)
             val chunks = Chunker.chunk(fixed)
 
             val pace = Pace(targetEngine.sampleRateHz * BYTES_PER_SAMPLE)

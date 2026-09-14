@@ -402,12 +402,11 @@ class UserDictionaryRepository(private val prefs: SharedPreferences) {
         }
     }
 
-    fun importDictionary(targetLanguage: String?, jsonString: String): Result<ImportResult> = synchronized(globalLock) {
-        val parsed = UserDictionaryJson.parseDictionary(jsonString).getOrElse {
-            return Result.failure(it)
+    fun importParsedDictionary(targetLanguage: String, dictionary: UserDictionary): Result<ImportResult> = synchronized(globalLock) {
+        val effectiveTag = targetLanguage.trim()
+        if (effectiveTag.isEmpty()) {
+            return Result.failure(IllegalArgumentException("Target language cannot be empty"))
         }
-
-        val effectiveTag = (targetLanguage?.trim().takeUnless { it.isNullOrEmpty() } ?: parsed.languageTag).trim()
         val current = loadSystem()
 
         val existingDicts = current.languages.firstOrNull {
@@ -415,15 +414,14 @@ class UserDictionaryRepository(private val prefs: SharedPreferences) {
             it.languageTag.replace('_', '-').equals(effectiveTag.replace('_', '-'), ignoreCase = true)
         }?.dictionaries ?: emptyList()
 
-        // Handle duplicate dictionary names safely (e.g. "User Dictionary (1)")
-        var finalName = parsed.dictionary.name
+        var finalName = dictionary.name
         var counter = 1
         while (existingDicts.any { it.name.equals(finalName, ignoreCase = true) }) {
-            finalName = "${parsed.dictionary.name} ($counter)"
+            finalName = "${dictionary.name} ($counter)"
             counter++
         }
 
-        val importedDict = parsed.dictionary.copy(
+        val importedDict = dictionary.copy(
             id = UUID.randomUUID().toString(),
             name = finalName
         )
@@ -445,6 +443,15 @@ class UserDictionaryRepository(private val prefs: SharedPreferences) {
 
         saveSystem(current.copy(languages = updatedLanguages))
         Result.success(ImportResult(importedDict, effectiveTag, importedDict.entries.size))
+    }
+
+    fun importDictionary(targetLanguage: String?, jsonString: String): Result<ImportResult> = synchronized(globalLock) {
+        val parsed = UserDictionaryJson.parseDictionary(jsonString).getOrElse {
+            return Result.failure(it)
+        }
+
+        val effectiveTag = (targetLanguage?.trim().takeUnless { it.isNullOrEmpty() } ?: parsed.languageTag).trim()
+        importParsedDictionary(effectiveTag, parsed.dictionary)
     }
 
     fun clearAll() = synchronized(globalLock) {

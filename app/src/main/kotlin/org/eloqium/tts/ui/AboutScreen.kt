@@ -183,7 +183,7 @@ private fun AboutProjectSection() {
             Spacer(modifier = Modifier.height(8.dp))
             InfoRow(label = "Engine Identifier", value = "Eloqium TTS (org.eloqium.tts)")
             Spacer(modifier = Modifier.height(8.dp))
-            InfoRow(label = "Version", value = "0.1.2")
+            InfoRow(label = "Version", value = "0.1.3")
             Spacer(modifier = Modifier.height(8.dp))
             InfoRow(label = "License", value = "Apache License 2.0 (Open Source)")
             Spacer(modifier = Modifier.height(8.dp))
@@ -216,7 +216,7 @@ private fun AboutEngineSection() {
             )
             Spacer(modifier = Modifier.height(10.dp))
             Text(
-                text = "Features include context-aware abbreviation expansion, full emoji and emoticon vocalization, configurable pause durations, and seamless screen-reader punctuation handling.",
+                text = "Features include multi-lingual user dictionaries (text and OpenEVV SPR pronunciation), context-aware abbreviation expansion, full emoji and emoticon vocalization, configurable pause durations, and seamless screen-reader punctuation handling.",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
