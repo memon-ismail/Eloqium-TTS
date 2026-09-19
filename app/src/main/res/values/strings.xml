@@ -7,7 +7,7 @@
     <string name="btn_eloqium_settings">Eloqium settings</string>
     <string name="btn_system_tts_settings">System TTS Settings</string>
     <string name="btn_about">About</string>
-    <string name="logo_content_description">Eloqium logo</string>
+    <string name="logo_content_description">Eloqium logo: A blue squircle with three fluid waves forming an E, representing the flow of digital speech</string>
     <string name="sample_text">This is an example of speech synthesized by Eloqium TTS. How does it sound?</string>
     <string name="settings_description">Eloqium TTS is an independent open-source text-to-speech engine delivering fast, highly intelligible speech synthesis for Android screen readers.</string>
     <string name="btn_github">Project on GitHub</string>

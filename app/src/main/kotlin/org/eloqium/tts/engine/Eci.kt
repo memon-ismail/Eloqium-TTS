@@ -40,11 +40,14 @@ object Eci {
 
     val SAMPLE_RATES = intArrayOf(8000, 11025, 22050, 16000, 32000, 44100, 48000)
 
-    fun sampleRateHz(index: Int): Int =
-        SAMPLE_RATES.getOrElse(index) { SAMPLE_RATES[1] }
+    fun sampleRateHz(indexOrHz: Int): Int {
+        if (indexOrHz in SAMPLE_RATES) return indexOrHz
+        return SAMPLE_RATES.getOrElse(indexOrHz) { SAMPLE_RATES[1] }
+    }
 
-    fun sampleRateIndex(hz: Int): Int {
-        val at = SAMPLE_RATES.indexOf(hz)
+    fun sampleRateIndex(hzOrIndex: Int): Int {
+        if (hzOrIndex in 0 until SAMPLE_RATES.size) return hzOrIndex
+        val at = SAMPLE_RATES.indexOf(hzOrIndex)
         return if (at >= 0) at else 1
     }
 

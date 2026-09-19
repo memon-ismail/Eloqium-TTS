@@ -332,3 +332,49 @@ fun ResetConfirmationDialog(
         }
     )
 }
+
+@Composable
+fun CapitalsIndicationDialog(
+    visible: Boolean,
+    currentMode: Int,
+    modes: List<String>,
+    onModeSelected: (Int) -> Unit,
+    onDismiss: () -> Unit
+) {
+    if (!visible) return
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Capitals indication", fontWeight = FontWeight.Bold) },
+        text = {
+            Column(modifier = Modifier.fillMaxWidth()) {
+                modes.forEachIndexed { index, label ->
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .selectable(
+                                selected = (currentMode == index),
+                                onClick = { onModeSelected(index) },
+                                role = Role.RadioButton
+                            )
+                            .semantics(mergeDescendants = true) {}
+                            .padding(vertical = 12.dp, horizontal = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        RadioButton(
+                            selected = (currentMode == index),
+                            onClick = null
+                        )
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Text(text = label, style = MaterialTheme.typography.bodyLarge)
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cancel")
+            }
+        }
+    )
+}
+

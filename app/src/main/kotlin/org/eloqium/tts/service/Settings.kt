@@ -41,6 +41,11 @@ object SettingsDefaults {
     const val KEY_USER_DICTIONARY_ENABLED = "user_dictionary_enabled"
     const val KEY_USER_DICTIONARIES_DATA = "user_dictionaries_data"
     const val KEY_ECI_VOICE_TAGS = "eci_voice_tags"
+    const val KEY_CAPITALS_INDICATION = "capitals_indication"
+    const val KEY_FOREGROUND_SERVICE_ENABLED = "foreground_service_enabled"
+    const val KEY_PERSISTENT_NOTIFICATION = "persistent_notification"
+    const val FOREGROUND_CHANNEL_ID = "eloqium_foreground_channel"
+    const val FOREGROUND_NOTIFICATION_ID = 1001
 
     // Defaults
     const val DEFAULT_ECI_VOICE_TAGS = true
@@ -62,7 +67,7 @@ object SettingsDefaults {
     const val DEFAULT_PUNCTUATION_LEVEL = 0 // 0=None, 1=Some, 2=Most, 3=All, 4=Custom
     const val DEFAULT_CUSTOM_PUNCTUATION = ""
     const val DEFAULT_USE_NUMBER_PROCESSING = false
-    const val DEFAULT_NUMBER_PROCESSING_MODE = 0 // 0=Digits, 1=Pairs, 2=Triplets
+    const val DEFAULT_NUMBER_PROCESSING_MODE = 0 // 0=Digits, 1=Pairs, 2=Triplets, 3=Smart
     const val DEFAULT_USE_ABBREVIATIONS = true
     const val DEFAULT_INTONATION_PAUSES = true
     const val DEFAULT_FORCE_LANGUAGE = false
@@ -70,6 +75,14 @@ object SettingsDefaults {
     const val DEFAULT_SAMPLING_RATE = 11025
     const val DEFAULT_PHRASE_PREDICTION = true
     const val DEFAULT_RESPECT_APP_VOICE = true
+    const val DEFAULT_CAPITALS_INDICATION = 0 // 0=None, 1=Pitch raise, 2=Say capital
+    const val DEFAULT_FOREGROUND_SERVICE_ENABLED = true
+    const val DEFAULT_PERSISTENT_NOTIFICATION = true
+
+    // Capitals indication modes
+    const val CAPITALS_NONE = 0
+    const val CAPITALS_PITCH_RAISE = 1
+    const val CAPITALS_SAY_CAPITAL = 2
 
     // Punctuation levels
     const val PUNCT_NONE = 0
@@ -82,6 +95,7 @@ object SettingsDefaults {
     const val NUMBER_DIGITS = 0
     const val NUMBER_PAIRS = 1
     const val NUMBER_TRIPLETS = 2
+    const val NUMBER_SMART = 3
 
     // Genuine sampling rates supported by OpenEVV
     val SUPPORTED_SAMPLING_RATES = intArrayOf(8000, 11025, 16000, 22050, 32000, 44100, 48000)
@@ -198,8 +212,8 @@ class Settings(val prefs: SharedPreferences) {
         set(value) = prefs.edit().putBoolean(SettingsDefaults.KEY_USE_NUMBER_PROCESSING, value).apply()
 
     var numberProcessingMode: Int
-        get() = prefs.getInt(SettingsDefaults.KEY_NUMBER_PROCESSING_MODE, SettingsDefaults.DEFAULT_NUMBER_PROCESSING_MODE).coerceIn(0, 2)
-        set(value) = prefs.edit().putInt(SettingsDefaults.KEY_NUMBER_PROCESSING_MODE, value.coerceIn(0, 2)).apply()
+        get() = prefs.getInt(SettingsDefaults.KEY_NUMBER_PROCESSING_MODE, SettingsDefaults.DEFAULT_NUMBER_PROCESSING_MODE).coerceIn(0, 3)
+        set(value) = prefs.edit().putInt(SettingsDefaults.KEY_NUMBER_PROCESSING_MODE, value.coerceIn(0, 3)).apply()
 
     // Abbreviations & Intonation pauses
     var useAbbreviations: Boolean
@@ -218,6 +232,11 @@ class Settings(val prefs: SharedPreferences) {
     var language: String
         get() = prefs.getString(SettingsDefaults.KEY_LANGUAGE, SettingsDefaults.DEFAULT_LANGUAGE) ?: SettingsDefaults.DEFAULT_LANGUAGE
         set(value) = prefs.edit().putString(SettingsDefaults.KEY_LANGUAGE, value).apply()
+
+    // Capitals indication (None=0, Pitch raise=1, Say capital=2)
+    var capitalsIndication: Int
+        get() = prefs.getInt(SettingsDefaults.KEY_CAPITALS_INDICATION, SettingsDefaults.DEFAULT_CAPITALS_INDICATION).coerceIn(0, 2)
+        set(value) = prefs.edit().putInt(SettingsDefaults.KEY_CAPITALS_INDICATION, value.coerceIn(0, 2)).apply()
 
     // Sampling rate
     var samplingRate: Int
@@ -251,6 +270,15 @@ class Settings(val prefs: SharedPreferences) {
         get() = prefs.getBoolean(SettingsDefaults.KEY_USER_DICTIONARY_ENABLED, SettingsDefaults.DEFAULT_USER_DICTIONARY_ENABLED)
         set(value) = prefs.edit().putBoolean(SettingsDefaults.KEY_USER_DICTIONARY_ENABLED, value).apply()
 
+    // Foreground Service & Reliability
+    var foregroundServiceEnabled: Boolean
+        get() = prefs.getBoolean(SettingsDefaults.KEY_FOREGROUND_SERVICE_ENABLED, SettingsDefaults.DEFAULT_FOREGROUND_SERVICE_ENABLED)
+        set(value) = prefs.edit().putBoolean(SettingsDefaults.KEY_FOREGROUND_SERVICE_ENABLED, value).apply()
+
+    var persistentNotification: Boolean
+        get() = prefs.getBoolean(SettingsDefaults.KEY_PERSISTENT_NOTIFICATION, SettingsDefaults.DEFAULT_PERSISTENT_NOTIFICATION)
+        set(value) = prefs.edit().putBoolean(SettingsDefaults.KEY_PERSISTENT_NOTIFICATION, value).apply()
+
     // Reset all settings to default
     fun resetAll() {
         prefs.edit()
@@ -276,11 +304,14 @@ class Settings(val prefs: SharedPreferences) {
             .putBoolean(SettingsDefaults.KEY_INTONATION_PAUSES, SettingsDefaults.DEFAULT_INTONATION_PAUSES)
             .putBoolean(SettingsDefaults.KEY_FORCE_LANGUAGE, SettingsDefaults.DEFAULT_FORCE_LANGUAGE)
             .putString(SettingsDefaults.KEY_LANGUAGE, SettingsDefaults.DEFAULT_LANGUAGE)
+            .putInt(SettingsDefaults.KEY_CAPITALS_INDICATION, SettingsDefaults.DEFAULT_CAPITALS_INDICATION)
             .putInt(SettingsDefaults.KEY_SAMPLING_RATE, SettingsDefaults.DEFAULT_SAMPLING_RATE)
             .putBoolean(SettingsDefaults.KEY_PHRASE_PREDICTION, SettingsDefaults.DEFAULT_PHRASE_PREDICTION)
             .putBoolean(SettingsDefaults.KEY_RESPECT_APP_VOICE, SettingsDefaults.DEFAULT_RESPECT_APP_VOICE)
             .putBoolean(SettingsDefaults.KEY_ECI_VOICE_TAGS, SettingsDefaults.DEFAULT_ECI_VOICE_TAGS)
             .putBoolean(SettingsDefaults.KEY_USER_DICTIONARY_ENABLED, SettingsDefaults.DEFAULT_USER_DICTIONARY_ENABLED)
+            .putBoolean(SettingsDefaults.KEY_FOREGROUND_SERVICE_ENABLED, SettingsDefaults.DEFAULT_FOREGROUND_SERVICE_ENABLED)
+            .putBoolean(SettingsDefaults.KEY_PERSISTENT_NOTIFICATION, SettingsDefaults.DEFAULT_PERSISTENT_NOTIFICATION)
             .apply()
     }
 }

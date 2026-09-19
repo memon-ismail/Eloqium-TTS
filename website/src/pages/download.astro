@@ -1,0 +1,38 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import LinkArrow from '../components/LinkArrow.astro';
+import { currentRelease, site } from '../data/site';
+---
+
+<BaseLayout
+  title="Download | Eloqium TTS"
+  description="Download the current Eloqium TTS Android APK, check the minimum Android requirement, and follow the installation steps."
+  currentPath="/download/"
+>
+  <div class="shell"><header class="page-intro"><p class="eyebrow">Download</p><h1>Download Eloqium TTS for Android.</h1><p class="page-lead">The current release can be downloaded directly from this page. After installation, enable Eloqium in Android’s text-to-speech settings and choose the voice and other options you want to use.</p></header></div>
+
+  <section class="page-section" aria-labelledby="download-heading">
+    <div class="shell download-hero-grid">
+      <div class="download-primary">
+        <p class="eyebrow">Current release</p>
+        <div class="version-lockup"><strong>{currentRelease.version}</strong><span>{currentRelease.title}</span></div>
+        <p>{currentRelease.summary}</p>
+        <p>The current application version is {currentRelease.version}. The latest verified public release APK available for download is v0.1.3.</p>
+        <div class="download-actions"><a class="button button-primary" href="https://github.com/memon-ismail/Eloqium-TTS/releases/download/v0.1.3/eloqium-tts-release.apk">Download v0.1.3 APK <span aria-hidden="true">↓</span></a><a class="button button-secondary" href="/releases/">View release history</a></div>
+      </div>
+      <div class="download-facts">
+        <h2 id="download-heading">Before installing</h2>
+        <dl class="detail-list">
+          <div><dt>Android requirement</dt><dd>{site.minAndroid}.</dd></div>
+          <div><dt>Package</dt><dd>An Android APK containing the Eloqium TTS application.</dd></div>
+          <div><dt>After installation</dt><dd>Open Eloqium and use <strong>System TTS Settings</strong> to select <strong>Eloqium TTS</strong> as the Preferred Engine.</dd></div>
+          <div><dt>Then</dt><dd>Return to the application and open <strong>Eloqium settings</strong> to select a language, voice profile, and any speech or text-processing options you want to change.</dd></div>
+        </dl>
+      </div>
+    </div>
+  </section>
+
+  <section class="page-section alt" aria-labelledby="install-heading"><div class="shell install-grid"><div><p class="section-kicker">Installation</p><h2 id="install-heading">Complete the initial setup in three steps.</h2><p class="section-summary">The installation process has two separate parts: installing the application itself and selecting it as the Android TTS engine.</p></div><ol class="steps"><li><span>01</span><div><h3>Install the APK</h3><p>Open the downloaded APK and complete Android’s installation process. Once the application has been installed, open Eloqium from the launcher.</p></div></li><li><span>02</span><div><h3>Set Eloqium as the preferred TTS engine</h3><p>On the Eloqium home screen, open <strong>System TTS Settings</strong>. In Android’s text-to-speech settings, select <strong>Eloqium TTS</strong> as the Preferred Engine.</p></div></li><li><span>03</span><div><h3>Configure the application</h3><p>Open <strong>Eloqium settings</strong> and choose a language and <strong>Voice profile</strong>. You can then change speech controls and text-processing settings as needed.</p></div></li></ol></div></section>
+
+  <section class="page-section" aria-labelledby="older-releases-heading"><div class="shell narrow-copy"><p class="eyebrow">Older releases</p><h2 id="older-releases-heading">Need a previous version?</h2><p>The Releases page keeps the published version history and provides the available APK for each listed release. Use it when you need an earlier build rather than the current download.</p><div class="inline-links"><LinkArrow href="/releases/" label="Browse all Eloqium releases" /><LinkArrow href={site.github} label="Open the GitHub project" external /></div></div></section>
+</BaseLayout>

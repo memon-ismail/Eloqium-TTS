@@ -1,0 +1,15 @@
+---
+interface Props {
+  href: string;
+  label: string;
+  external?: boolean;
+  class?: string;
+}
+
+const { href, label, external = false, class: className = '' } = Astro.props;
+---
+
+<a class={`arrow-link ${className}`} href={href} target={external ? '_blank' : undefined} rel={external ? 'noreferrer' : undefined}>
+  <span>{label}</span>
+  <span aria-hidden="true">{external ? '↗' : '→'}</span>
+</a>

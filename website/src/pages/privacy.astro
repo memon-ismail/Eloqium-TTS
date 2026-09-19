@@ -1,0 +1,24 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+---
+
+<BaseLayout
+  title="Privacy | Eloqium TTS"
+  description="Privacy information for the Eloqium TTS Android application, including on-device speech processing, network permissions, and application dependencies."
+  currentPath="/privacy/"
+>
+  <div class="shell"><header class="page-intro"><p class="eyebrow">Privacy</p><h1>Speech processing stays in the application.</h1><p class="page-lead">Eloqium is built to perform text processing and speech synthesis on the Android device. The points below describe the application itself rather than the privacy policies of Android, your screen reader, or other software.</p></header></div>
+
+  <section class="page-section" aria-labelledby="privacy-heading">
+    <div class="shell privacy-facts">
+      <div><p class="section-kicker">Application behavior</p><h2 id="privacy-heading">What the app does with your speech requests.</h2></div>
+      <div class="fact-list">
+        <article><span class="fact-mark">01</span><div><h3>Speech synthesis is performed locally</h3><p>The Eloqium text-processing and native synthesis path runs inside the Android application. The application does not depend on a remote speech-generation service for normal synthesis.</p></div></article>
+        <article><span class="fact-mark">02</span><div><h3>No Android INTERNET permission</h3><p>The application manifest does not request <code>android.permission.INTERNET</code>. This is an application permission fact; it should not be read as a guarantee about the behavior of the Android operating system or other applications on the device.</p></div></article>
+        <article><span class="fact-mark">03</span><div><h3>No advertising or analytics libraries in the app module</h3><p>The current application module does not list advertising or analytics SDKs among its dependencies. The current project does not include a separate telemetry service for speech processing.</p></div></article>
+      </div>
+    </div>
+  </section>
+
+  <section class="page-section alt" aria-labelledby="privacy-boundary-heading"><div class="shell narrow-copy"><p class="eyebrow">Scope</p><h2 id="privacy-boundary-heading">Other software can have its own privacy behavior.</h2><p>Android, screen readers, keyboards, browsers, and applications that send text to a TTS engine may have their own permissions, network behavior, and privacy policies. Eloqium’s privacy information covers the Eloqium TTS application itself.</p></div></section>
+</BaseLayout>

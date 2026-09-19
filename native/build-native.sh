@@ -9,7 +9,7 @@ engine="$here/openevv"
 ABIS=${ABIS:-"arm64-v8a"}
 API=${API:-21}
 RULES=${RULES:-bytecode}
-LANGS=${LANGS:-lang/enus}
+LANGS=${LANGS:-"lang/enus lang/engb lang/eses lang/esus lang/frfr lang/frca lang/dede lang/itit"}
 OUT=${OUT:-"$root/app/build/native/jniLibs"}
 JOBS=${JOBS:-$(nproc 2>/dev/null || echo 4)}
 # Apply architecture and multi-language patches to upstream openevv
@@ -55,7 +55,7 @@ if [ -z "${ANDROID_NDK_HOME:-${ANDROID_NDK_ROOT:-}}" ]; then
     rsp="$engine/$build/objects.rsp"
     : > "$rsp"
     for o in "$engine/$objdir"/*.o; do
-        echo "$o" >> "$rsp"
+        echo "\"$o\"" >> "$rsp"
     done
     
     ( cd "$engine" && clang -O2 -std=gnu99 -fPIC -fvisibility=hidden -fsigned-char \

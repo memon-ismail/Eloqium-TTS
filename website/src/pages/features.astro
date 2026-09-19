@@ -1,0 +1,50 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import LinkArrow from '../components/LinkArrow.astro';
+import { numberProcessingModes, punctuationLevels, voicePresets } from '../data/site';
+---
+
+<BaseLayout
+  title="Features | Eloqium TTS"
+  description="Detailed information about Eloqium TTS voice controls, punctuation levels, number processing, abbreviations, emoji, emoticons, pauses, and user dictionaries."
+  currentPath="/features/"
+>
+  <div class="shell"><header class="page-intro"><p class="eyebrow">Features</p><h1>Controls for speech, text, and pronunciation.</h1><p class="page-lead">Eloqium gives you separate controls for the sound of the voice and for the way incoming text is prepared for speech. The descriptions below explain what the settings change and how the available choices differ.</p></header></div>
+
+  <section class="page-section" aria-labelledby="voice-features-heading">
+    <div class="shell feature-list-layout">
+      <div><p class="section-kicker">Voice</p><h2 id="voice-features-heading">Choose a voice and adjust the way it sounds.</h2><p class="section-summary">The first two settings categories cover the voice itself and additional voice-character adjustments.</p></div>
+      <div class="feature-list">
+        <article><h3>Voices and regional variants</h3><p>Eloqium currently provides eight regional language variants: US English, UK English, Spanish for Spain, Spanish for Mexico and Latin America, French for France, French for Canada, German, and Italian. Every variant uses the same eight voice presets: {voicePresets.join(', ')}.</p><LinkArrow href="/voices/" label="View the complete voice list" /></article>
+        <article><h3>Speech rate</h3><p>The <strong>Speech rate</strong> setting uses a relative scale from -10 to +10, with 0 representing the engine’s normal baseline. When <strong>Force rate</strong> is disabled, Eloqium uses the speech-rate value supplied by the Android application making the request. When it is enabled, the configured Eloqium value is used instead. <strong>Unlock maximum rate</strong> extends the upper limit available to the forced rate setting.</p></article>
+        <article><h3>Pitch</h3><p>The <strong>Pitch</strong> setting provides a relative adjustment from -10 to +10 around the selected voice’s base pitch. With <strong>Force pitch</strong> disabled, Eloqium follows the pitch requested through Android’s TTS interface; with it enabled, Eloqium applies the configured pitch value instead.</p></article>
+        <article><h3>Volume</h3><p><strong>Force volume</strong> enables a relative digital gain adjustment on the synthesized 16-bit PCM audio before it is supplied to Android. The <strong>Volume</strong> setting can attenuate the signal below its baseline or increase it above the baseline, with the resulting samples constrained to the 16-bit range. This does not replace Android’s normal system playback volume control.</p></article>
+        <article><h3>Voice characteristics</h3><p><strong>Inflection</strong>, <strong>Head size</strong>, <strong>Roughness</strong>, and <strong>Breathiness</strong> provide additional relative controls around the selected voice’s baseline parameters. These settings are separate from the basic rate and pitch controls, so they can be adjusted when you want to change the character of the voice without simply making it faster or higher.</p></article>
+        <article><h3>ECI Voice Tags</h3><p>The <strong>ECI Voice Tags</strong> setting controls whether compatible inline backquote voice and control annotations in incoming text are allowed through the compatibility-processing stage. It is intended for applications or content that deliberately use such annotations.</p></article>
+        <article><h3>Sampling rate</h3><p>Eloqium provides seven selectable sampling rates: 8,000 Hz, 11,025 Hz, 16,000 Hz, 22,050 Hz, 32,000 Hz, 44,100 Hz, and 48,000 Hz. The default rate is 11,025 Hz. This setting changes the rate used by the native synthesis engine rather than an Android device requirement.</p></article>
+        <article><h3>Eloqium foreground service</h3><p>Provides foreground-service support that can improve reliability during background speech, particularly on devices with restrictive background management. The service includes an ongoing notification while active and access to Android battery optimization settings.</p></article>
+      </div>
+    </div>
+  </section>
+
+  <section class="page-section alt" aria-labelledby="text-features-heading">
+    <div class="shell feature-list-layout">
+      <div><p class="section-kicker">Text processing</p><h2 id="text-features-heading">Decide how symbols, numbers, and written forms are prepared.</h2><p class="section-summary">These settings affect the text that is prepared for the native speech synthesizer. They are particularly useful when ordinary written text contains information that you want presented differently when heard aloud.</p></div>
+      <div class="feature-list">
+        <article><h3>Punctuation</h3><p>Enable <strong>Process punctuation</strong> when you want punctuation marks to be verbalized. The <strong>Punctuation level</strong> setting determines how broad the spoken-punctuation set is:</p><dl class="definition-list punctuation-definitions">{punctuationLevels.map((level) => <div><dt>{level.name}</dt><dd>{level.description}</dd></div>)}</dl><p>Punctuation that is not spoken can still affect ordinary phrasing and pause behavior. Number and time expressions also receive special handling so that punctuation inside them is not treated in exactly the same way as punctuation standing alone.</p></article>
+        <article><h3>Numbers</h3><p>When <strong>Use number processing</strong> is enabled, the selected mode determines how a multi-digit sequence is separated before synthesis:</p><dl class="definition-list">{numberProcessingModes.map((mode) => <div><dt>{mode.name}</dt><dd>{mode.description}</dd></div>)}</dl><p>Phonetic pronunciation entries are protected from number processing, so digits already contained inside a pronunciation annotation are not reformatted by this setting.</p></article>
+        <article><h3>Capital indication</h3><p>Controls how uppercase letters are handled during speech. The available options are <strong>None</strong>, <strong>Pitch raise</strong>, and <strong>Say capital</strong>. When Pitch raise is selected, Eloqium raises pitch only for standalone uppercase one-letter words, such as <code>A</code> or <code>I</code>, without altering uppercase characters inside ordinary words.</p></article>
+        <article><h3>Abbreviations</h3><p><strong>Use abbreviations</strong> enables the built-in abbreviation dictionary. It expands supported forms such as titles, road and address abbreviations, and common expressions including <code>e.g.</code>, <code>i.e.</code>, and <code>etc.</code>. The processor also applies context-sensitive handling for forms such as <code>St.</code> so that common uses can be distinguished.</p></article>
+        <article><h3>Emoji and emoticons</h3><p><strong>Emoji / Emoticon</strong> enables speech descriptions for supported emoji sequences and a defined set of ASCII emoticons. Emoji are converted into localized spoken descriptions before synthesis. The emoticon processor protects patterns that resemble URLs, times, ratios, Windows paths, code operators, and similar text so they are not accidentally treated as emoticons.</p></article>
+        <article><h3>Intonation pauses</h3><p><strong>Intonation pauses</strong> changes how Eloqium prepares pauses around punctuation. When enabled, the normal pause-preserving mode is retained. When disabled, the broader pause-processing path is used. Phrase prediction is a separate setting and is enabled by default.</p></article>
+      </div>
+    </div>
+  </section>
+
+  <section class="page-section" aria-labelledby="dictionary-feature-heading">
+    <div class="shell capability-layout">
+      <div><p class="eyebrow">Pronunciation</p><h2 id="dictionary-feature-heading">Customize individual words and phrases.</h2><p>The User Dictionary can replace incoming text or supply a specific pronunciation for text that needs to be spoken differently. Dictionaries are associated with a regional language and can contain multiple independent rules.</p><LinkArrow href="/dictionary/" label="Read the dictionary guide" /></div>
+      <div class="callout"><p class="callout-label">Android TTS</p><p>Eloqium is implemented as an Android <code>TextToSpeechService</code>. Compatible applications can use Android’s standard text-to-speech interface to request supported languages and voices and to send text for synthesis.</p><LinkArrow href="/guide/" label="Read the setup guide" /></div>
+    </div>
+  </section>
+</BaseLayout>

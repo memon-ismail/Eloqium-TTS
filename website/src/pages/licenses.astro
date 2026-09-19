@@ -1,0 +1,16 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import { site } from '../data/site';
+---
+
+<BaseLayout
+  title="Licenses | Eloqium TTS"
+  description="Licensing information for Eloqium TTS and the third-party components and data included with the project."
+  currentPath="/licenses/"
+>
+  <div class="shell"><header class="page-intro"><p class="eyebrow">Licenses</p><h1>Licensing information</h1><p class="page-lead">Eloqium’s own code is released under the Apache License 2.0. Some incorporated components and data have separate licensing and attribution terms, which are recorded in the project notices.</p></header></div>
+
+  <section class="page-section" aria-labelledby="license-heading"><div class="shell license-grid"><article class="license-card"><p class="section-kicker">Eloqium</p><h2 id="license-heading">Apache License 2.0</h2><p>The Eloqium Android application code is licensed under the Apache License 2.0. The project’s license file contains the terms that apply to the project’s own code.</p><a class="arrow-link" href={`${site.github}/blob/main/LICENSE`} target="_blank" rel="noreferrer"><span>Read the Apache License 2.0 file</span><span aria-hidden="true">↗</span></a></article><article class="license-card"><p class="section-kicker">Third-party material</p><h2>Separate licenses and notices</h2><p>The repository contains third-party components, reference material, and data with their own attribution or licensing requirements. OpenEVV, EVVDroid-related material, AOSP interfaces, and Unicode/CLDR data are covered by the project’s notices.</p><a class="arrow-link" href={`${site.github}/blob/main/THIRD_PARTY_LICENSES.md`} target="_blank" rel="noreferrer"><span>Read third-party licenses and notices</span><span aria-hidden="true">↗</span></a></article></div></section>
+
+  <section class="page-section alt" aria-labelledby="notice-heading"><div class="shell narrow-copy"><p class="eyebrow">Project notices</p><h2 id="notice-heading">Detailed attribution is kept with the source.</h2><p>The repository contains the complete project notices and third-party licensing information so that the application’s own license can remain distinct from the terms that apply to bundled components and datasets.</p><div class="inline-links"><a class="arrow-link" href={`${site.github}/blob/main/NOTICE`} target="_blank" rel="noreferrer"><span>Read NOTICE</span><span aria-hidden="true">↗</span></a><a class="arrow-link" href={`${site.github}/blob/main/THIRD_PARTY_LICENSES.md`} target="_blank" rel="noreferrer"><span>Read third-party license details</span><span aria-hidden="true">↗</span></a></div></div></section>
+</BaseLayout>

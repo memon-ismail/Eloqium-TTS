@@ -18,3 +18,7 @@ This software incorporates or derives from components of the following projects:
 3. Android Open Source Project (AOSP)
    Copyright (c) The Android Open Source Project
    Licensed under the Apache License, Version 2.0.
+
+4. Unicode Consortium Data Files (Unicode 16.0 & CLDR 48)
+   Copyright (c) 1991-2024 Unicode, Inc.
+   Governed by the Unicode License Agreement.

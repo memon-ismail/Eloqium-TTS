@@ -1,0 +1,77 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import LinkArrow from '../components/LinkArrow.astro';
+import { site } from '../data/site';
+---
+
+<BaseLayout
+  title="About | Eloqium TTS"
+  description="About Eloqium TTS, an Android text-to-speech project created and maintained by Ismail Memon, with project background and provenance information."
+  currentPath="/about/"
+>
+  <div class="shell">
+    <header class="page-intro">
+      <p class="eyebrow">About</p>
+      <h1>Eloqium TTS</h1>
+      <p class="page-lead">Eloqium TTS is an Android text-to-speech engine and an alternative to the Eloquence text-to-speech engine for Android.</p>
+    </header>
+  </div>
+
+  <section class="page-section" aria-labelledby="about-introduction-heading">
+    <div class="shell about-layout">
+      <div>
+        <p class="section-kicker">About Eloqium</p>
+        <h2 id="about-introduction-heading">A configurable speech engine for Android.</h2>
+      </div>
+      <div class="prose">
+        <p>Eloqium was created as an Android TTS engine that can be used through the platform’s standard text-to-speech system. It brings together regional voice variants, named voice profiles, speech controls, text-processing features, and a user dictionary in one application.</p>
+        <p>The project is intended to be useful for everyday reading as well as for accessibility-focused use, particularly where a reader needs more control over pronunciation, punctuation, speech characteristics, or the way structured text is spoken.</p>
+        <p>Eloqium is developed independently. The application uses the OpenEVV native synthesis core together with its own Android service, text-processing pipeline, settings interface, and dictionary system.</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="page-section alt" aria-labelledby="about-created-heading">
+    <div class="shell about-layout">
+      <div>
+        <p class="section-kicker">Project</p>
+        <h2 id="about-created-heading">Created and maintained by</h2>
+      </div>
+      <div class="prose">
+        <p><strong>Ismail Memon</strong> created and maintains the Eloqium TTS project. Development, application changes, documentation, and releases are maintained as part of the Eloqium project repositories.</p>
+        <p>The project remains independently developed, while its bundled components and historical sources are documented separately so that their origins and licensing can be understood.</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="page-section" aria-labelledby="about-thanks-heading">
+    <div class="shell about-layout">
+      <div>
+        <p class="section-kicker">Acknowledgements</p>
+        <h2 id="about-thanks-heading">Special thanks to</h2>
+      </div>
+      <div class="prose">
+        <p><strong>Chandu Rathod</strong> and <strong>Yashraj Shinde</strong> are thanked for their support and contribution to the project.</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="page-section alt" aria-labelledby="about-background-heading">
+    <div class="shell about-layout">
+      <div>
+        <p class="section-kicker">Background and provenance</p>
+        <h2 id="about-background-heading">Components and provenance, documented separately.</h2>
+      </div>
+      <div class="prose">
+        <p>Eloqium uses OpenEVV as its native speech-synthesis core. The project also records relevant provenance and attribution for other incorporated material, including the native streaming architecture referenced from EVVDroid and data or notices that have their own licensing terms.</p>
+        <p>These details are kept separate from the main product experience so that the website can remain readable while the repository continues to provide the deeper technical and legal record.</p>
+        <div class="about-links-grid">
+          <a href={site.github} target="_blank" rel="noreferrer"><strong>GitHub repository <span aria-hidden="true">↗</span></strong><span>Source code, issues, releases, and project activity.</span></a>
+          <a href={`${site.github}/blob/main/PROVENANCE.md`} target="_blank" rel="noreferrer"><strong>Provenance <span aria-hidden="true">↗</span></strong><span>Project lineage and relevant component history.</span></a>
+          <a href={site.telegram} target="_blank" rel="noreferrer"><strong>Telegram channel <span aria-hidden="true">↗</span></strong><span>Project announcements and community updates.</span></a>
+          <a href="/licenses/"><strong>Licensing information</strong><span>Project license and third-party licensing summary.</span></a>
+        </div>
+      </div>
+    </div>
+  </section>
+</BaseLayout>

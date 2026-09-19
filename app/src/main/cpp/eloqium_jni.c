@@ -206,6 +206,7 @@ JNIEXPORT void JNICALL Java_org_eloqium_tts_engine_NativeEngine_destroy(JNIEnv* 
 	pthread_cond_broadcast(&in->filled);
 	pthread_cond_broadcast(&in->work);
 	pthread_mutex_unlock(&in->lock);
+	eciStop(in->eci);
 	if (in->running) {
 		pthread_join(in->worker, NULL);
 		in->running = 0;
@@ -312,6 +313,7 @@ JNIEXPORT void JNICALL Java_org_eloqium_tts_engine_NativeEngine_stop(JNIEnv* env
 	pthread_cond_broadcast(&in->room);
 	pthread_cond_broadcast(&in->filled);
 	pthread_mutex_unlock(&in->lock);
+	eciStop(in->eci);
 }
 
 static int ensure_dict(instance* in) {
@@ -403,7 +405,10 @@ JNIEXPORT jint JNICALL Java_org_eloqium_tts_engine_NativeEngine_setParam(JNIEnv*
 	instance* in = unwrap(handle);
 	(void)env;
 	(void)cls;
-	return in == NULL ? -1 : eciSetParam(in->eci, param, value);
+	if (in == NULL)
+		return -1;
+	wait_until_idle(in);
+	return eciSetParam(in->eci, param, value);
 }
 
 JNIEXPORT jint JNICALL Java_org_eloqium_tts_engine_NativeEngine_getParam(JNIEnv* env, jclass cls, jlong handle, jint param) {
@@ -417,7 +422,10 @@ JNIEXPORT jint JNICALL Java_org_eloqium_tts_engine_NativeEngine_setVoiceParam(JN
 	instance* in = unwrap(handle);
 	(void)env;
 	(void)cls;
-	return in == NULL ? -1 : eciSetVoiceParam(in->eci, voice, param, value);
+	if (in == NULL)
+		return -1;
+	wait_until_idle(in);
+	return eciSetVoiceParam(in->eci, voice, param, value);
 }
 
 JNIEXPORT jint JNICALL Java_org_eloqium_tts_engine_NativeEngine_getVoiceParam(JNIEnv* env, jclass cls, jlong handle, jint voice, jint param) {
@@ -431,7 +439,10 @@ JNIEXPORT jint JNICALL Java_org_eloqium_tts_engine_NativeEngine_copyVoice(JNIEnv
 	instance* in = unwrap(handle);
 	(void)env;
 	(void)cls;
-	return in == NULL ? -1 : eciCopyVoice(in->eci, from, to);
+	if (in == NULL)
+		return -1;
+	wait_until_idle(in);
+	return eciCopyVoice(in->eci, from, to);
 }
 
 JNIEXPORT jintArray JNICALL Java_org_eloqium_tts_engine_NativeEngine_languages(JNIEnv* env, jclass cls) {

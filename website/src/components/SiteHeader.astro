@@ -1,0 +1,68 @@
+---
+import { navItems } from '../data/site';
+
+interface Props {
+  currentPath: string;
+}
+
+const { currentPath } = Astro.props;
+const isHome = currentPath === '/';
+---
+
+<header class:list={["site-header", isHome && "site-header-home"]}>
+  <div class="shell header-inner">
+    {isHome ? (
+      <div class="home-brand-block">
+        <a class="home-logo-link" href="/" aria-label="Eloqium TTS home">
+          <img src="/images/eloqium-logo.png" alt="Eloqium TTS logo" width="176" height="176" />
+        </a>
+      </div>
+    ) : (
+      <a class="wordmark" href="/" aria-label="Eloqium TTS home">
+        <span class="wordmark-name">Eloqium</span><span class="wordmark-tag">TTS</span>
+      </a>
+    )}
+
+    <button class:list={["menu-toggle", isHome && "home-menu-toggle"]} type="button" aria-expanded="false" aria-controls="primary-navigation" data-menu-button>
+      <span class="menu-icon" aria-hidden="true"><span></span><span></span><span></span></span>
+      <span data-menu-label>Menu</span>
+    </button>
+
+    <nav class="primary-navigation" id="primary-navigation" aria-label="Primary navigation" data-menu hidden>
+      <ul>
+        {navItems.map((item) => (
+          <li><a href={item.href} aria-current={currentPath === item.href ? 'page' : undefined}>{item.label}</a></li>
+        ))}
+      </ul>
+    </nav>
+  </div>
+</header>
+
+<script>
+  const button = document.querySelector('[data-menu-button]');
+  const menu = document.querySelector('[data-menu]');
+  const label = document.querySelector('[data-menu-label]');
+
+  if (button instanceof HTMLButtonElement && menu instanceof HTMLElement && label instanceof HTMLElement) {
+    const setOpen = (open: boolean) => {
+      button.setAttribute('aria-expanded', String(open));
+      menu.toggleAttribute('hidden', !open);
+      label.textContent = open ? 'Close menu' : 'Menu';
+    };
+
+    button.addEventListener('click', () => {
+      setOpen(button.getAttribute('aria-expanded') !== 'true');
+    });
+
+    menu.addEventListener('click', (event) => {
+      if (event.target instanceof HTMLAnchorElement) setOpen(false);
+    });
+
+    document.addEventListener('keydown', (event) => {
+      if (event.key === 'Escape' && button.getAttribute('aria-expanded') === 'true') {
+        setOpen(false);
+        button.focus();
+      }
+    });
+  }
+</script>

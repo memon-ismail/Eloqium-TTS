@@ -9,296 +9,164 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/Version-0.1.3-blue.svg" alt="Version 0.1.3" />
+  <img src="https://img.shields.io/badge/Version-0.1.4-blue.svg" alt="Version 0.1.4" />
   <img src="https://img.shields.io/badge/License-Apache_2.0-blue.svg" alt="Apache 2.0 License" />
   <img src="https://img.shields.io/badge/Platform-Android_6.0%2B-green.svg" alt="Android 6.0+" />
   <img src="https://img.shields.io/badge/Architecture-ARM64%20%7C%20ARMv7%20%7C%20x86__64-orange.svg" alt="Architecture" />
-  <img src="https://img.shields.io/badge/Synthesis-100%25_Offline-brightgreen.svg" alt="100% Offline" />
+  <img src="https://img.shields.io/badge/Synthesis-On--Device_Offline-brightgreen.svg" alt="On-Device Offline" />
   <img src="https://img.shields.io/badge/Voices-64_Voices-blueviolet.svg" alt="64 Voices" />
 </p>
 
 ---
 
-## Contents
-
-1. [About](#about)
-2. [Features](#features)
-3. [Supported Languages and Voices](#supported-languages-and-voices)
-4. [Installation](#installation)
-5. [Using Eloqium](#using-eloqium)
-6. [Settings](#settings)
-7. [Android TTS Integration](#android-tts-integration)
-8. [Offline and Privacy](#offline-and-privacy)
-9. [Building From Source](#building-from-source)
-10. [Architecture](#architecture)
-11. [Open-Source Components](#open-source-components)
-12. [Third-Party Dependencies](#third-party-dependencies)
-13. [Dictionary and Data Licensing](#dictionary-and-data-licensing)
-14. [Contributing](#contributing)
-15. [Known Limitations](#known-limitations)
-16. [Links](#links)
-17. [License](#license)
-
----
-
 ## About
- 
-Eloqium TTS (version 0.1.3) is an independent open-source text-to-speech engine designed for Android screen-reader users and everyday speech output. It provides fast, clear, and highly responsive speech synthesis that works completely offline on your device.
- 
-The project was created and is maintained by **Ismail Memon**.
 
-### Special Thanks To
+Eloqium TTS is an independent open-source text-to-speech engine designed for Android screen-reader users and everyday speech output. It pairs an optimized native build of the OpenEVV formant synthesis engine with modern Android accessibility services to deliver responsive, clear, and fully offline speech synthesis.
 
-1. Chandu Rathod
-
-2. Yashraj Shinde
-
-Eloqium pairs an optimized native build of OpenEVV with modern Android accessibility services to deliver instantaneous response times and zero audio lag during rapid touch exploration and reading.
+The project was created and is maintained by **Ismail Memon**, with special thanks to Chandu Rathod and Yashraj Shinde.
 
 ---
 
 ## Features
 
-- **64 Distinct Voices**: 8 language dialects with 8 selectable voice presets each (Reed, Shelley, Bobby, Rocko, Glen, Sandy, Grandpa, Grandma).
-- **Language and Regional Voice Support**: Native speech models across 5 language families comprising 8 regional variants: US English, UK English, Castilian Spanish, Latin American Spanish, French, Canadian French, German, and Italian.
-- **Speech Rate Control**: Granular relative rate adjustment (-10 to +10) with an optional high-speed mode for advanced screen-reader users.
-- **Pitch and Tone Shaping**: Adjust pitch, inflection, head size, roughness, and breathiness to customize voice personality.
-- **Digital Volume Boost**: Clean PCM audio amplification with built-in clipping protection for noisy environments.
-- **ECI Voice Tags Control**: Granular toggle to control interpretation of inline ECI parameter commands (`vv`, `vb`, `vs`, `vf`, `vh`, `vr`, `vy`, `p`) with rogue backtick sanitization, while preserving dictionary phoneme markers and pause cadences.
-- **Punctuation Controls**: Five selectable punctuation verbosity levels (None, Some, Most, All, Custom) matching screen-reader preferences and user-defined symbol speech.
-- **User Dictionary**: Multi-lingual, language-scoped text and phonetic pronunciation dictionaries (OpenEVV SPR phonemes), IBM `.dic` dictionary import with automatic encoding detection, Schema v2 JSON import/export, and real-time two-level search and filtering across dictionaries and words.
-- **Intonation and Pause Controls**: Natural clause boundaries and customizable pause cadences.
-- **Emoji and Emoticon Speech**: Full spoken descriptions for over 3,800 Unicode emojis and common text emoticons.
-- **Number and Abbreviation Processing**: Context-aware expansion for common abbreviations and numbers without unexpected spelling pauses.
-- **100% Offline Synthesis**: Zero network permissions required; all audio generation occurs locally on the processor.
-- **Android TTS Integration**: Full compliance with the Android Text-to-Speech framework and screen readers like TalkBack.
-- **Selectable Sampling Rates**: Supports both 11,025 Hz and 22,050 Hz output modes.
-- **Accessibility-First Interface**: User interface designed with high-contrast elements, touch targets of 48dp or larger, and complete screen-reader labeling.
+- **64 Distinct Voices**: 8 regional language variants with 8 selectable voice presets each (Reed, Shelley, Bobby, Rocko, Glen, Sandy, Grandma, Grandpa).
+- **Multilingual Support**: Speech models across 5 language families: US English, UK English, Castilian Spanish, Latin American Spanish, French, Canadian French, German, and Italian.
+- **Granular Speech Controls**: Configurable speech rate (with an optional maximum rate unlock mode), pitch, native sampling rate (8,000 Hz to 48,000 Hz), and digital volume scaling.
+- **Voice Characteristics**: Fine-tune inflection, vocal tract head size, roughness, and breathiness.
+- **Punctuation Modes**: Five selectable punctuation levels (None, Some, Most, All, Custom) respecting screen-reader preferences and user-defined symbol speech.
+- **Capitals Indication**: Announce uppercase letters via pitch raise (cleanly raising pitch for standalone single-letter words) or explicit verbalization (None, Pitch raise, Say capital).
+- **Background Speech Reliability**: Dedicated *Eloqium foreground service* with persistent notification and battery optimization controls to improve speech reliability when running in the background, particularly on devices with restrictive background management.
+- **User Dictionary**: Multi-lingual text replacements and OpenEVV SPR phonetic pronunciation overrides, IBM `.dic` import, Schema v2 JSON import/export, and real-time search.
+- **Emoji and Emoticons**: Spoken descriptions for 3,805 Unicode 16.0 emojis and conservative ASCII emoticons across 5 language families.
+- **Number & Abbreviation Processing**: Context-aware abbreviation expansion and selectable number formatting (Digits, Pairs, Triplets, and Smart grouping for phone numbers and OTP codes).
+- **On-Device Offline Architecture**: Operates entirely locally with zero telemetry and does not request Android network permissions.
+- **Accessible Interface**: Built with high-contrast UI, minimum 48dp touch targets, standard graphical vector navigation icons, and full TalkBack semantics.
 
 ---
 
 ## Supported Languages and Voices
 
-Eloqium provides 64 genuine voices across 5 language families comprising 8 regional variants:
+Eloqium provides 64 genuine voices (8 regional variants &times; 8 presets):
 
-| Language Family | Regional Variant | Locale Code | Region | Default Voice |
-| :--- | :--- | :--- | :--- | :--- |
-| **English** | English (US) | `en-US` / `eng-USA` | United States | `eng-USA-Reed` |
-| **English** | English (UK) | `en-GB` / `eng-GBR` | United Kingdom | `eng-GBR-Reed` |
-| **Spanish** | Spanish (Spain) | `es-ES` / `spa-ESP` | Spain | `spa-ESP-Reed` |
-| **Spanish** | Spanish (Latin America) | `es-MX` / `spa-MEX` | Latin America / Mexico | `spa-MEX-Reed` |
-| **French** | French (France) | `fr-FR` / `fra-FRA` | France | `fra-FRA-Reed` |
-| **French** | French (Canada) | `fr-CA` / `fra-CAN` | Canada | `fra-CAN-Reed` |
-| **German** | German (Germany) | `de-DE` / `deu-DEU` | Germany | `deu-DEU-Reed` |
-| **Italian** | Italian (Italy) | `it-IT` / `ita-ITA` | Italy | `ita-ITA-Reed` |
+| Regional Variant | Locale Code | Region | Default Canonical Voice |
+| :--- | :--- | :--- | :--- |
+| **English (US)** | `en-US` / `eng-USA` | United States | `eng-USA-Reed` |
+| **English (UK)** | `en-GB` / `eng-GBR` | United Kingdom | `eng-GBR-Reed` |
+| **Spanish (Spain)** | `es-ES` / `spa-ESP` | Spain | `spa-ESP-Reed` |
+| **Spanish (Latin America)** | `es-MX` / `spa-MEX` | Latin America / Mexico | `spa-MEX-Reed` |
+| **French (France)** | `fr-FR` / `fra-FRA` | France | `fra-FRA-Reed` |
+| **French (Canada)** | `fr-CA` / `fra-CAN` | Canada | `fra-CAN-Reed` |
+| **German (Germany)** | `de-DE` / `deu-DEU` | Germany | `deu-DEU-Reed` |
+| **Italian (Italy)** | `it-IT` / `ita-ITA` | Italy | `ita-ITA-Reed` |
 
-Each language includes 8 voice presets:
-1. **Reed** (Default clear voice)
-2. **Shelley**
-3. **Bobby**
-4. **Rocko**
-5. **Glen**
-6. **Sandy**
-7. **Grandma**
-8. **Grandpa**
+Voice Presets: **Reed** (default), **Shelley**, **Bobby**, **Rocko**, **Glen**, **Sandy**, **Grandma**, and **Grandpa**.
 
 ---
 
-## Installation
+## Installation & Setup
 
-1. Download the latest release APK (`eloqium-tts-release.apk`) from the [Releases](https://github.com/memon-ismail/eloqium-tts/releases) page.
-2. Open the downloaded file on your Android device and install it.
-3. Launch the **Eloqium** app from your home screen or app drawer.
-
----
-
-## Using Eloqium
-
-1. Open the **Eloqium** application.
-2. On the home screen, tap **System TTS Settings** to directly open Android's speech output settings.
-3. Select **Eloqium TTS** as your Preferred Engine.
-4. Return to the Eloqium home screen and tap **Eloqium settings** to customize your voice, speech rate, pitch, and punctuation preferences.
+1. Download `eloqium-tts-release.apk` from the [Releases](https://github.com/memon-ismail/eloqium-tts/releases) page.
+2. Install the APK on your Android device (Android 6.0+).
+3. Open the **Eloqium** app and tap **System TTS Settings** on the home screen.
+4. Select **Eloqium TTS** as your Preferred Engine.
+5. Tap **Eloqium settings** on the home screen to customize voice, rate, pitch, and punctuation preferences.
 
 ---
 
-## Settings
+## Eloqium Settings
 
-The **Eloqium settings** screen allows you to fine-tune speech parameters:
+The settings screen provides seven organized categories:
 
-- **Voice Profile**: Choose the default voice preset (Reed, Shelley, Bobby, etc.).
-- **Speech Rate**: Adjust reading speed. Enable *Unlock High Speed* to access higher speaking rates.
-- **Pitch**: Raise or lower the base voice pitch.
-- **Volume**: Adjust digital output gain.
-- **Voice Characteristics**: Fine-tune inflection, head size, roughness, and breathiness.
-- **ECI Voice Tags**: Toggle inline ECI voice parameter tag interpretation on/off. When enabled (default), preserves valid ECI parameter commands while preventing digit-splitting and sanitizing rogue backticks. When disabled, converts user backticks to apostrophes to prevent unexpected tag execution while keeping dictionary phoneme tags and pause markers intact.
-- **Punctuation Level**: Select None, Some, Most, All, or Custom:
-  - **None**: Pure prosodic phrasing without spoken symbols.
-  - **Some**: Verbalizes mathematical and syntax symbols (`*`, `/`, `\`, `#`, `%`, `&`, `+`, `=`, `@`, `^`, `~`, `<`, `>`, `|`, `$`).
-  - **Most**: Some + structural delimiters (parentheses, brackets, braces, quotes, dashes, colons, semicolons).
-  - **All**: All punctuation marks including sentence terminators (periods, commas, question marks, exclamation marks).
-  - **Custom**: Verbalizes only user-specified characters entered in the custom punctuation field; all other marks remain prosodic.
-- **Emoji and Emoticons**: Toggle spoken announcements for emojis and text smiles.
-- **Number Processing**: Choose between natural numbers and individual digit reading.
-- **Abbreviations**: Enable or disable context-sensitive abbreviation expansion.
-- **User Dictionary**: Toggle global dictionary processing on/off and open the **Dictionary Manager** to configure languages, add custom word replacements (`Text` or OpenEVV SPR `Pronunciation`), import IBM `.dic` files with destination language selection, and search/filter dictionaries and entries.
-- **Audio Sample Rate**: Select 11,025 Hz or 22,050 Hz.
-- **Reset All Settings**: Restore all configuration values to their defaults.
+1. **Voice**: Select voice preset, configure speech rate (with *Force rate* and *Unlock maximum rate*), base pitch (with *Force pitch*), output volume (with *Force volume* digital gain scaling), and toggle inline *ECI Voice Tags*.
+2. **Voice Characteristics**: Adjust *Inflection*, *Head size*, *Roughness*, and *Breathiness* on a relative -10 to +10 scale.
+3. **Text Processing**: Configure *Emoji / Emoticon* vocalization, *Process punctuation* toggle, *Punctuation level* (None, Some, Most, All, Custom), *Custom punctuation* symbol list, *Number processing* mode (Digits, Pairs, Triplets, Smart), *Use abbreviations*, and *Intonation pauses*.
+4. **User Dictionary**: Global dictionary toggle and navigation to the multi-lingual Dictionary Manager.
+5. **Language & Audio**: Configure *Force language*, default *Language*, native synthesis *Sampling rate* (8,000 Hz to 48,000 Hz; default 11,025 Hz), and *Capitals indication* (None, Pitch raise, Say capital).
+6. **Advanced**: Configure *Eloqium foreground service* (with *App notifications*, *Show persistent notification*, and *Battery optimization* controls to improve speech reliability when running in the background).
+7. **Reset**: Reset all configuration preferences to default values.
 
 ---
 
-## Android TTS Integration
+## Architecture
 
-Eloqium integrates with Android's system text-to-speech service architecture. It works with:
-- **Android TalkBack** and other accessibility screen readers.
-- In-app text reading, e-book readers, and GPS navigation apps.
-- Dynamic language switching per sentence based on system locale requests.
+Eloqium processes speech requests through a thread-safe, sequential linear pipeline:
 
-When reading rapidly with TalkBack, Eloqium aborts previous speech instantly upon touch or swipe gestures, ensuring responsive exploration without lingering audio.
+```
+[Incoming Synthesis Request]
+             │
+             ▼
+ 1. Text Preprocessing          (User dictionary, abbreviations, emojis, emoticons, numbers)
+             │
+             ▼
+ 2. Normalization & Formatting  (Unicode normalization, punctuation verbosity, capitals indication)
+             │
+             ▼
+ 3. Synthesis Preparation       (Opener fixes, backtick sanitization, sentence chunking, pause tags)
+             │
+             ▼
+ 4. OpenEVV Native Core      (Asynchronous native worker thread, circular PCM ring buffer)
+             │
+             ▼
+ 5. Android Audio Stream     (SynthesisCallback streaming, digital gain if Force volume enabled)
+```
+
+- **Immediate Interruption**: Rapid speech cancellations (such as TalkBack touch exploration) invoke `NativeEngine.stop()` via `eciDataAbort`, promptly flushing internal buffers.
+- **Router Compatibility**: Adheres to standard Android `TextToSpeechService` contracts with canonical BCP-47 locale handling to support dynamic language routers and screen readers.
 
 ---
 
 ## Offline and Privacy
 
-- **Zero Network Permissions**: The application does not request the `android.permission.INTERNET` permission in its manifest.
-- **No Analytics or Telemetry**: No crash reporters, identifiers, or analytics libraries are present.
-- **100% On-Device Processing**: Every piece of text is processed and synthesized entirely within the device's local memory.
+- **Zero Network Permissions**: The application does not request `android.permission.INTERNET` and performs no network communication.
+- **No Telemetry**: No crash analytics, tracking identifiers, or remote telemetry libraries are included. All speech processing executes entirely on-device.
 
 ---
 
 ## Building From Source
 
 ### Prerequisites
-- Android SDK (minSdk 23, compileSdk 36, targetSdk 35) and Android NDK (version 26.1.10909125 or newer).
+- Android SDK (compileSdk 36, minSdk 23) and NDK (version 26.1+).
 - JDK 17.
 - Git with submodule support.
 
-### Step 1: Clone the Repository
 ```bash
+# Clone with submodules
 git clone --recurse-submodules https://github.com/memon-ismail/eloqium-tts.git
 cd eloqium-tts
-```
 
-### Step 2: Build Native Libraries
-```bash
+# Build native libraries (ARM64, ARMv7, x86_64)
 ./native/build-native.sh
-```
-This builds `libeloqiumjni.so` for `arm64-v8a`, `armeabi-v7a`, and `x86_64` with 16 KB ELF page-size alignment.
 
-### Step 3: Run Standalone Test Suite
-```bash
+# Run standalone regression suite
 bash test/run-tests.sh
-```
 
-### Step 4: Assemble the Release APK
-```bash
+# Assemble release APK
 ./gradlew assembleRelease
 ```
-The compiled release APK will be located at `app/build/outputs/apk/release/app-release.apk`.
-
----
-
-## Architecture
-
-Eloqium processes speech requests through a thread-safe, unidirectional pipeline:
-
-```
-[Screen Reader / TTS Client]
-             |
-             v
-[EloqiumTtsService (Android TextToSpeechService)]
-             |
-             +--> UserDictionaryProcessor (Language-scoped word & phrase replacements)
-             +--> AbbreviationProcessor (Grammar & context expansion)
-             +--> EmojiProcessor & EmoticonProcessor (Spoken descriptions)
-             +--> NumberProcessor (Digits vs. numeric reading)
-             +--> Intonation pause mode resolution (PAUSE_KEEP vs. PAUSE_ALL)
-             +--> UnicodeNormalizer (NFKC canonical folding)
-             +--> ScreenReaderPunctuationProcessor (Verbosity filtering: None, Some, Most, All, Custom)
-             +--> OpenEVVCompatibilityFixes (Token & separator rules)
-             +--> Chunker (Boundary-aware segmentation)
-             +--> PauseProcessor & OpenEVVEncoder (Clause markers & Latin-1 byte mapping)
-             |
-             v
-[Native JNI Bridge (libeloqiumjni.so)]
-             |
-             v
-[OpenEVV Synthesis Engine] ---> [Mutex-Synchronized Audio Ring Buffer] ---> [PCM Callback]
-```
-
-### Native Concurrency & Synchronization
-The native bridge (`app/src/main/cpp/eloqium_jni.c`) coordinates background synthesis using:
-- A circular ring buffer protected by `pthread_mutex_t` and `pthread_cond_t` condition variables (`room` and `filled`).
-- Asynchronous synthesis on a dedicated native worker thread.
-- Immediate synthesis abort upon `onStop()` calls, preventing buffer backlogs.
-- Full 16 KB ELF segment page-size alignment compliant with modern Android requirements.
-
----
-
-## Open-Source Components
-
-- **OpenEVV (`libevv`)**: Open-source C speech synthesizer core (MIT License).
-- **Android Platform (AOSP)**: Text-to-speech service contracts and system bindings (Apache License 2.0).
-- **Unicode CLDR Data**: Multi-language emoji and symbol definitions (Unicode License).
-- **EVVDroid**: Architecture reference for JNI audio streaming (Apache License 2.0).
-
----
-
-## Third-Party Dependencies
-
-Eloqium relies exclusively on open-source Android Jetpack and Kotlin libraries:
-- `androidx.core:core-ktx`
-- `androidx.activity:activity-compose`
-- `androidx.compose:compose-bom` (Material 3, UI, Tooling Preview)
-- `org.jetbrains.kotlinx:kotlin-stdlib`
-
----
-
-## Dictionary and Data Licensing
-
-- **Clean-Room Abbreviation Processor**: All abbreviations and disambiguation rules are implemented in Kotlin (`AbbreviationProcessor.kt`) under the Apache 2.0 license.
-- **Proprietary Dictionaries Excluded**: Proprietary binary dictionary formats (`.cfd`, `.dct`, `.jdf`) are intentionally excluded to respect copyright boundaries.
-- **User Dictionary Subsystem**: Eloqium TTS includes an open-format User Dictionary subsystem storing user-defined text replacements and OpenEVV SPR phonetic pronunciation overrides in standard JSON (Schema Version 2). It also supports IBM `.dic` dictionary import with automatic encoding detection and layer classification, language-scoped isolation, four match modes (Exact match, Starts with, Ends with, Contains), case sensitivity, real-time search, and non-cascading single-pass replacements.
-
----
-
-## Contributing
-
-Contributions are welcome! To contribute:
-1. Fork the repository.
-2. Create a focused feature branch (`git checkout -b feature/improvement`).
-3. Ensure all automated tests pass (`bash test/run-tests.sh`).
-4. Submit a pull request on GitHub with a clear summary of changes.
 
 ---
 
 ## Known Limitations
 
-- **Language Scope**: Limited to the 8 supported language variants compiled into the core OpenEVV engine.
-- **Sample Rate**: Native audio synthesis is 11,025 Hz or 22,050 Hz 16-bit mono PCM.
+- **Language Scope**: Limited to the 8 compiled regional variants in the OpenEVV core.
+- **Formant Synthesis**: Voice preset changes apply per utterance; inline preset tags do not alter vocal tract models during ongoing formant synthesis.
+- **Dictionary Storage**: IBM `.dic` files serve as an external import format; internal storage uses native JSON Schema Version 2.
+- **Audio Output**: Streams 16-bit mono linear PCM audio at selectable sampling rates (8 kHz to 48 kHz).
 
 ---
 
-## Links
+## Technical Documentation
 
-- **GitHub**: [https://github.com/memon-ismail/eloqium-tts](https://github.com/memon-ismail/eloqium-tts)
-- **Connect on Telegram**: [https://t.me/blindroidofficial](https://t.me/blindroidofficial)
+Detailed subsystem specifications are available in the `docs/` directory:
+- [User Dictionary Specification](docs/user-dictionary.md): Dictionary model, matching modes, precedence, and IBM `.dic` import.
+- [Punctuation & Intonation Specification](docs/punctuation-behavior.md): Punctuation levels, custom punctuation, and phrase prediction.
+- [Emoji & Emoticon Specification](docs/emoji-emoticon-pipeline.md): Unicode 16.0 trie matching, emoticon protection, and spoken descriptions.
+- [Engine & Router Compatibility](docs/engine-router-compatibility.md): Canonical voice names, aliases, and Android TTS routing contracts.
+- [Architectural Provenance](PROVENANCE.md): Upstream OpenEVV lineage, EVVDroid lineage, and licensing boundaries.
 
 ---
 
 ## License
 
-```
-Copyright (c) 2026 Ismail Memon and contributors.
-
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
-
-    http://www.apache.org/licenses/LICENSE-2.0
-
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
-```
+Copyright (c) 2026 Ismail Memon and contributors. Licensed under the [Apache License, Version 2.0](LICENSE).  
+Native OpenEVV core is licensed under the MIT License with the IBM Speech Synthesis Language Rules Notice. See [NOTICE](NOTICE) and [THIRD_PARTY_LICENSES.md](THIRD_PARTY_LICENSES.md) for details.

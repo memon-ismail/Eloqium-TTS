@@ -4,8 +4,8 @@ import android.speech.tts.TextToSpeech
 import java.util.Locale
 
 /**
- * Robust locale mapping and normalization ensuring 100% standard compliance
- * with Android TextToSpeechService and external multilingual engine routers.
+ * Robust locale mapping and normalization conforming to standard Android
+ * TextToSpeechService conventions and external multilingual engine routers.
  *
  * Mapped to the 8 genuine language modules bundled and compiled in OpenEVV:
  * - en-US (0x00010000)
@@ -33,15 +33,15 @@ object LocaleMatcher {
     }
 
     val ENTRIES = listOf(
-        LanguageEntry(0x00010000, "en", "US", "eng", "USA", Locale("en", "USA"), "English (United States)"),
-        LanguageEntry(0x00010001, "en", "GB", "eng", "GBR", Locale("en", "GBR"), "English (United Kingdom)"),
-        LanguageEntry(0x00020000, "es", "ES", "spa", "ESP", Locale("es", "ESP"), "Spanish (Spain)"),
-        LanguageEntry(0x00020001, "es", "MX", "spa", "MEX", Locale("es", "MEX"), "Spanish (Latin America)", 
+        LanguageEntry(0x00010000, "en", "US", "eng", "USA", Locale("en", "US"), "English (United States)"),
+        LanguageEntry(0x00010001, "en", "GB", "eng", "GBR", Locale("en", "GB"), "English (United Kingdom)"),
+        LanguageEntry(0x00020000, "es", "ES", "spa", "ESP", Locale("es", "ES"), "Spanish (Spain)"),
+        LanguageEntry(0x00020001, "es", "MX", "spa", "MEX", Locale("es", "MX"), "Spanish (Latin America)", 
             setOf("US", "USA", "MX", "MEX", "419", "AR", "ARG", "CO", "COL", "CL", "CHL")),
-        LanguageEntry(0x00030000, "fr", "FR", "fra", "FRA", Locale("fr", "FRA"), "French (France)"),
-        LanguageEntry(0x00030001, "fr", "CA", "fra", "CAN", Locale("fr", "CAN"), "French (Canada)"),
-        LanguageEntry(0x00040000, "de", "DE", "deu", "DEU", Locale("de", "DEU"), "German (Germany)"),
-        LanguageEntry(0x00050000, "it", "IT", "ita", "ITA", Locale("it", "ITA"), "Italian (Italy)")
+        LanguageEntry(0x00030000, "fr", "FR", "fra", "FRA", Locale("fr", "FR"), "French (France)"),
+        LanguageEntry(0x00030001, "fr", "CA", "fra", "CAN", Locale("fr", "CA"), "French (Canada)"),
+        LanguageEntry(0x00040000, "de", "DE", "deu", "DEU", Locale("de", "DE"), "German (Germany)"),
+        LanguageEntry(0x00050000, "it", "IT", "ita", "ITA", Locale("it", "IT"), "Italian (Italy)")
     )
 
     private val BY_ECI = ENTRIES.associateBy { it.eciId }

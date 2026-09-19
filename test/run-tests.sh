@@ -4,7 +4,20 @@ set -e
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 
-ABI="${1:-}"
+SUITE_ARGS=()
+ABI=""
+
+for arg in "$@"; do
+    case "$arg" in
+        arm64-v8a|armeabi-v7a|x86_64|x86)
+            ABI="$arg"
+            ;;
+        *)
+            SUITE_ARGS+=("$arg")
+            ;;
+    esac
+done
+
 if [ -z "$ABI" ]; then
     ARCH="$(uname -m)"
     case "$ARCH" in
@@ -45,4 +58,4 @@ kotlinc -cp "$BUILD_DIR:$LIB_PATH" -include-runtime -d "$BUILD_DIR/TestRunner.ja
     "$ROOT_DIR"/app/src/main/kotlin/org/eloqium/tts/ui/AboutNavigation.kt
 
 echo "=== Executing Eloqium Test Suite on $ABI ==="
-java -Djava.library.path="$LIB_PATH" -cp "$BUILD_DIR:$BUILD_DIR/TestRunner.jar" test.TestRunnerKt
+java -Djava.library.path="$LIB_PATH" -cp "$BUILD_DIR:$BUILD_DIR/TestRunner.jar" test.TestRunnerKt "${SUITE_ARGS[@]}"

@@ -16,6 +16,7 @@ import org.eloqium.tts.engine.SpeechRateMapper
 import org.eloqium.tts.engine.VoiceParameterMapper
 import org.eloqium.tts.engine.VoiceRegistry
 import org.eloqium.tts.pipeline.AbbreviationProcessor
+import org.eloqium.tts.pipeline.CapitalsProcessor
 import org.eloqium.tts.pipeline.Chunker
 import org.eloqium.tts.pipeline.EmojiData
 import org.eloqium.tts.pipeline.EmojiProcessor
@@ -59,6 +60,7 @@ class EloqiumTtsService : TextToSpeechService() {
         try {
             _settings = Settings(this)
             Log.i(TAG, "onCreate: Settings initialized early (voiceProfile=${_settings?.voiceProfile})")
+            _settings?.let { EloqiumForegroundService.syncService(applicationContext, it) }
         } catch (t: Throwable) {
             Log.e(TAG, "onCreate: Failed early settings initialization, will use defaults", t)
         }
@@ -209,14 +211,19 @@ class EloqiumTtsService : TextToSpeechService() {
         return mutableSetOf()
     }
 
-    private fun ensureEngine(languageId: Int): EloqiumEngine? = synchronized(engineLock) {
+    private fun ensureEngine(languageId: Int, sampleRateHz: Int = SettingsDefaults.DEFAULT_SAMPLING_RATE): EloqiumEngine? = synchronized(engineLock) {
         val existing = engine
-        if (existing != null && existing.language == languageId) {
+        if (existing != null && existing.language == languageId && existing.sampleRateHz == sampleRateHz) {
             return existing
         }
-        Log.i(TAG, "ensureEngine: Opening engine for languageId=0x${Integer.toHexString(languageId)}")
+        if (existing != null && existing.language == languageId) {
+            if (existing.setSampleRate(sampleRateHz)) {
+                return existing
+            }
+        }
+        Log.i(TAG, "ensureEngine: Opening engine for languageId=0x${Integer.toHexString(languageId)} at ${sampleRateHz}Hz")
         existing?.close()
-        val created = EloqiumEngine.open(languageId)
+        val created = EloqiumEngine.open(languageId, sampleRateHz)
         engine = created
         if (created == null) {
             Log.e(TAG, "ensureEngine: Failed to open native engine for languageId=0x${Integer.toHexString(languageId)}")
@@ -280,15 +287,30 @@ class EloqiumTtsService : TextToSpeechService() {
             val resolvedVoiceDesc = VoiceRegistry.findDefaultVoiceFor(entry, preset)
             activeVoiceDesc = resolvedVoiceDesc
 
-            val targetEngine = ensureEngine(entry.eciId)
+            var targetEngine = ensureEngine(entry.eciId, settings.samplingRate)
             if (targetEngine == null) {
                 Log.e(TAG, "Failed to initialize engine for ${entry.displayName} (eciId=0x${Integer.toHexString(entry.eciId)})")
                 callback.error(TextToSpeech.ERROR_SERVICE)
                 return
             }
 
-            // Apply Sampling Rate
-            targetEngine.setSampleRate(settings.samplingRate)
+            // Apply Sampling Rate with fallback re-open on mismatch
+            if (targetEngine.sampleRateHz != settings.samplingRate) {
+                val success = targetEngine.setSampleRate(settings.samplingRate)
+                if (!success || targetEngine.sampleRateHz != settings.samplingRate) {
+                    Log.w(TAG, "setSampleRate(${settings.samplingRate}) did not take effect, reopening engine")
+                    synchronized(engineLock) {
+                        engine?.close()
+                        engine = EloqiumEngine.open(entry.eciId, settings.samplingRate)
+                        targetEngine = engine
+                    }
+                    if (targetEngine == null) {
+                        Log.e(TAG, "Failed to reinitialize engine at ${settings.samplingRate}Hz")
+                        callback.error(TextToSpeech.ERROR_SERVICE)
+                        return
+                    }
+                }
+            }
 
             // Apply Abbreviations (Native ECI parameter)
             targetEngine.setAbbreviations(settings.useAbbreviations)
@@ -389,8 +411,15 @@ class EloqiumTtsService : TextToSpeechService() {
                 customPunctuation = settings.customPunctuation
             )
 
-            // Pipeline step 7: OpenEVV fixes & Chunking
-            val fixed = OpenEVVCompatibilityFixes.apply(punctuated, settings.eciVoiceTagsEnabled)
+            // Pipeline step 7: Capitals Indication
+            val capitalsProcessed = CapitalsProcessor.process(
+                punctuated,
+                mode = settings.capitalsIndication,
+                basePitch = pitch
+            )
+
+            // Pipeline step 8: OpenEVV fixes & Chunking
+            val fixed = OpenEVVCompatibilityFixes.apply(capitalsProcessed, settings.eciVoiceTagsEnabled)
             val chunks = Chunker.chunk(fixed)
 
             val pace = Pace(targetEngine.sampleRateHz * BYTES_PER_SAMPLE)

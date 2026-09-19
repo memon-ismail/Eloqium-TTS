@@ -19,7 +19,7 @@ class EloqiumEngine private constructor(private val handle: Long, val language: 
     companion object {
         private const val TAG = "EloqiumEngine"
 
-        fun open(language: Int): EloqiumEngine? {
+        fun open(language: Int, initialSampleRateHz: Int = 11025): EloqiumEngine? {
             if (!NativeEngine.loaded) {
                 Log.e(TAG, "Native library not loaded", NativeEngine.loadError)
                 return null
@@ -29,33 +29,34 @@ class EloqiumEngine private constructor(private val handle: Long, val language: 
                 Log.e(TAG, "Failed to create native engine for language 0x%08x".format(language))
                 return null
             }
-            return EloqiumEngine(handle, language).apply { configure() }
+            return EloqiumEngine(handle, language).apply { configure(initialSampleRateHz) }
         }
     }
 
-    private fun configure() {
+    private fun configure(initialSampleRateHz: Int) {
         NativeEngine.setParam(handle, Eci.PARAM_LANGUAGE_DIALECT, language)
         NativeEngine.setParam(handle, Eci.PARAM_SYNTH_MODE, 0)
         NativeEngine.setParam(handle, Eci.PARAM_REAL_WORLD_UNITS, 0)
         NativeEngine.setParam(handle, Eci.PARAM_INPUT_TYPE, 1) // Enable annotations
-        setSampleRate(Eci.sampleRateHz(NativeEngine.getParam(handle, Eci.PARAM_SAMPLE_RATE)))
+        setSampleRate(initialSampleRateHz)
         applyVoice(0)
     }
 
     fun close() = synchronized(lock) {
         if (!closed) {
             closed = true
+            NativeEngine.stop(handle)
             NativeEngine.destroy(handle)
         }
     }
 
-    fun setSampleRate(hz: Int) {
-        synchronized(lock) {
-            if (closed) return
-            val index = Eci.sampleRateIndex(hz)
-            NativeEngine.setParam(handle, Eci.PARAM_SAMPLE_RATE, index)
-            sampleRateHz = Eci.sampleRateHz(index)
-        }
+    fun setSampleRate(hz: Int): Boolean = synchronized(lock) {
+        if (closed) return false
+        val index = Eci.sampleRateIndex(hz)
+        val rc = NativeEngine.setParam(handle, Eci.PARAM_SAMPLE_RATE, index)
+        val actual = NativeEngine.getParam(handle, Eci.PARAM_SAMPLE_RATE)
+        sampleRateHz = Eci.sampleRateHz(actual)
+        return rc >= 0 && sampleRateHz == Eci.sampleRateHz(index)
     }
 
     val currentBasePitch: Int get() = basePitch
@@ -127,12 +128,12 @@ class EloqiumEngine private constructor(private val handle: Long, val language: 
         return NativeEngine.speak(handle, bytes)
     }
 
-    fun read(dst: ByteArray): Int = synchronized(lock) {
+    fun read(dst: ByteArray): Int {
         if (closed) return -1
         return NativeEngine.read(handle, dst)
     }
 
-    fun stop() = synchronized(lock) {
+    fun stop() {
         if (!closed) NativeEngine.stop(handle)
     }
 }

@@ -6,7 +6,7 @@ package org.eloqium.tts.pipeline
  */
 object OpenEVVCompatibilityFixes {
 
-    private val PHONETIC_TAG_REGEX = Regex("""`\[[^\]\r\n\t]+\]""")
+    private val PROTECTED_SYSTEM_TAG_REGEX = Regex("""`(\[[^\]\r\n\t]+\]|vb\d+)""")
 
     /**
      * Supported user ECI voice and control annotation tags.
@@ -30,19 +30,19 @@ object OpenEVVCompatibilityFixes {
 
     fun apply(text: String, eciVoiceTagsEnabled: Boolean = true): String {
         if (text.isEmpty()) return text
-        if (!text.contains("`[")) {
+        if (!text.contains("`[") && !text.contains("`vb")) {
             return applyFixes(text, eciVoiceTagsEnabled)
         }
 
         val sb = StringBuilder(text.length + 16)
         var cursor = 0
-        for (match in PHONETIC_TAG_REGEX.findAll(text)) {
+        for (match in PROTECTED_SYSTEM_TAG_REGEX.findAll(text)) {
             val start = match.range.first
             val end = match.range.last + 1
             if (start > cursor) {
                 sb.append(applyFixes(text.substring(cursor, start), eciVoiceTagsEnabled))
             }
-            // Emit phonetic SPR tag verbatim without digit, opener, or backtick corruption
+            // Emit protected system tag verbatim without digit, opener, or backtick corruption
             sb.append(match.value)
             cursor = end
         }

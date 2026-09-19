@@ -2,53 +2,36 @@
 
 ## 1. Project Background
 
-**Eloqium TTS** (`org.eloqium.tts`) is an independent open-source Android Text-to-Speech engine created and maintained by **Ismail Memon**. It is engineered to deliver fast, highly intelligible speech synthesis for Android screen-reader users.
-
-The project was created to address long-standing limitations, compatibility failures, and prosodic flaws in prior Android OpenEVV wrappers, while providing a modern, standard-compliant, maintainable implementation.
+**Eloqium TTS** (`org.eloqium.tts`) is an independent open-source Android Text-to-Speech engine created and maintained by **Ismail Memon**. It is designed to deliver fast, highly intelligible speech synthesis for Android screen-reader users and everyday listeners.
 
 ---
 
-## 2. Lineage and Component Provenance
+## 2. Component Lineage
 
 ### 2.1 Native Speech Engine: OpenEVV (`libevv`)
 - **Upstream Repository**: https://github.com/Mudb0y/openevv
-- **License**: MIT + IBM Language Rules Notice.
-- **Architectural Enhancements Applied in Eloqium TTS**:
-  - **Delta-Low Adjacent Stores Patch (`0001-delta_low-adjacent-stores.patch`)**: Prevents compiler vectorizer register corruption in the Delta VM state on 64-bit ARM architectures.
-  - **ARM32 Frame Alignment Patch (`0002-arm32-frame-alignment.patch`)**: Ensures 8-byte stack frame alignment across JNI call boundaries on 32-bit ARM (armeabi-v7a).
-  - **Native Compiler Verification**: Successfully compiled natively on ARM64 Android with Termux `clang` 21.1.8.
+- **License**: MIT License + IBM Speech Synthesis Language Rules Notice.
+- **Architecture**: OpenEVV provides the native C formant synthesis engine and linguistic rules tables. Eloqium applies architecture patches for ARM64 Delta-Low vectorizer state preservation and ARM32 frame alignment.
 
-### 2.2 Native JNI & Audio Pipeline Lineage (from EVVDroid)
-- **Source Repository**: https://github.com/trypsynth/evvdroid (Apache 2.0).
-- **Preserved Core Strengths**:
-  - Persistent native worker thread avoiding thread creation per utterance.
-  - Ring buffer synchronization (`take`, `give`, `filled`, `room` condition variables).
-  - Pure C JNI callbacks avoiding cross-thread JNI reflection during audio synthesis.
-  - Cancellation via `eciDataAbort` returned from the native callback, avoiding the instability of `eciStop`.
-  - Sentence-aware chunking and 300ms audio pacing lead.
-
-### 2.3 Critical Deviations & Incompatible Code Removed from EVVDroid
-Eloqium TTS completely departs from EVVDroid in the following areas:
-
-1. **Locale Representation**:
-   - *EVVDroid flaw*: Initialized `Locale` objects with 3-letter country codes (`Locale("eng", "USA")`), causing `MissingResourceException` inside AOSP `TextToSpeech.java` and failures with external engine routers.
-   - *Eloqium TTS fix*: Uses canonical BCP-47 / ISO 639-1 + ISO 3166-1 alpha-2 `Locale` objects (`Locale("en", "US")`, `Locale("en", "GB")`, etc.), eliminating all crashes.
-
-2. **Caller Voice Selection**:
-   - *EVVDroid flaw*: Synthesizer ignored `request.voiceName` requested by the caller and forced the engine's internal UI preset.
-   - *Eloqium TTS fix*: Full dynamic voice resolution parsing `request.voiceName` into `(language, preset)`.
-
-3. **Language Availability Matching**:
-   - *EVVDroid flaw*: Incompatible with routers checking strict equality against `LANG_AVAILABLE`.
-   - *Eloqium TTS fix*: Implemented bidirectional ISO-2/ISO-3 normalization with permissive matching.
-
-4. **Punctuation & Prosody Pipeline**:
-   - *EVVDroid flaw*: Disabled Phrase Prediction by default (`pp0`), flattening intonation; injected spaces and pauses before punctuation (`Pauses.kt`), breaking clause boundaries.
-   - *Eloqium TTS fix*: Enforces `pp1` by default, strictly binds terminal punctuation to words, and handles unicode quotes/dashes cleanly.
+### 2.2 Native Audio Streaming Architecture (EVVDroid Reference)
+- **Source Repository**: https://github.com/trypsynth/evvdroid (Apache License 2.0).
+- **Architecture**: Eloqium builds upon the native JNI worker thread and circular PCM ring buffer synchronization concepts originally demonstrated in EVVDroid, including pure C callbacks and immediate speech cancellation via `eciDataAbort`.
 
 ---
 
-## 3. Clean-Room Licensing Compliance
+## 3. Independent Implementations
 
-- **No GPL code**: Although the NVDA IBMTTS Driver is a popular desktop implementation, it is licensed under GPLv2. To protect the Apache-2.0 status of Eloqium TTS, no code was copied or ported from the NVDA driver. All text processing and Android service code was written clean-room.
-- **Attribution retained**: Full copyright notices and licenses from OpenEVV and EVVDroid are retained in `NOTICE` and `THIRD_PARTY_LICENSES.md`.
+All application-level subsystems and text processing modules in Eloqium TTS were written independently:
+- **Canonical Locale & Router Handling**: Full AOSP `TextToSpeechService` implementation using standard BCP-47 two-letter `Locale` instances (`Locale("en", "US")`) to ensure compatibility with Android TTS clients and multi-engine routers.
+- **Text Preprocessing Pipeline**: Independent implementations of Unicode 16.0 trie emoji matching, ASCII emoticon protection, context-aware abbreviation expansion, number formatting, and screen-reader punctuation verbosity.
+- **Punctuation & Intonation**: Default-enabled phrase prediction (`pp1`) and clause-boundary attachment preserving natural interrogative and declarative pitch contours.
+- **User Dictionary Subsystem**: Independent multi-lingual dictionary engine supporting text and OpenEVV SPR phonetic entries, JSON Schema v2 persistence, and legacy IBM `.dic` importing.
+- **Modern User Interface**: Native Jetpack Compose interface built for accessibility, TalkBack navigation, and Material 3 design.
+
+---
+
+## 4. Licensing Boundaries
+
+- **Eloqium TTS Core**: Licensed under the Apache License, Version 2.0.
+- **No GPL Dependencies**: No code was ported or copied from GPL-licensed projects (such as the desktop NVDA IBMTTS driver). All Kotlin, Java, and glue code is Apache-2.0.
+- **Upstream Notices**: Copyright attributions and third-party notices for OpenEVV, EVVDroid, and Unicode CLDR data are maintained in [NOTICE](NOTICE) and [THIRD_PARTY_LICENSES.md](THIRD_PARTY_LICENSES.md).

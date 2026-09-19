@@ -21,6 +21,7 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.DividerDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.RadioButton
@@ -41,6 +42,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
+import org.eloqium.tts.R
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
@@ -49,11 +52,13 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import org.eloqium.tts.engine.Eci
 import org.eloqium.tts.engine.LocaleMatcher
+import org.eloqium.tts.service.EloqiumForegroundService
 import org.eloqium.tts.service.Settings
 import org.eloqium.tts.service.SettingsDefaults
 
 sealed class SettingsSubScreen {
     object SETTINGS : SettingsSubScreen()
+    object FOREGROUND_SERVICE : SettingsSubScreen()
     object DICTIONARY_MANAGER : SettingsSubScreen()
     data class LANGUAGE_DICTIONARIES(val languageTag: String) : SettingsSubScreen()
     data class DICTIONARY_ENTRIES(val languageTag: String, val dictionaryId: String) : SettingsSubScreen()
@@ -102,6 +107,7 @@ fun SettingsScreen(
     var forceLanguage by remember { mutableStateOf(settings.forceLanguage) }
     var language by remember { mutableStateOf(settings.language) }
     var samplingRate by remember { mutableIntStateOf(settings.samplingRate) }
+    var capitalsIndication by remember { mutableIntStateOf(settings.capitalsIndication) }
 
     // Dialog visibility states
     var showVoiceDialog by remember { mutableStateOf(false) }
@@ -116,10 +122,12 @@ fun SettingsScreen(
     var showNumberDialog by remember { mutableStateOf(false) }
     var showLangDialog by remember { mutableStateOf(false) }
     var showSamplingDialog by remember { mutableStateOf(false) }
+    var showCapitalsDialog by remember { mutableStateOf(false) }
     var showResetDialog by remember { mutableStateOf(false) }
 
     val punctLevels = listOf("None", "Some", "Most", "All", "Custom")
-    val numberModes = listOf("Digits", "Pairs", "Triplets")
+    val numberModes = listOf("Digits", "Pairs", "Triplets", "Smart")
+    val capitalsModes = listOf("None", "Pitch raise", "Say capital")
 
     fun refreshAllFromSettings() {
         voiceProfile = settings.voiceProfile
@@ -145,6 +153,7 @@ fun SettingsScreen(
         forceLanguage = settings.forceLanguage
         language = settings.language
         samplingRate = settings.samplingRate
+        capitalsIndication = settings.capitalsIndication
         userDictionaryEnabled = settings.userDictionaryEnabled
         eciVoiceTagsEnabled = settings.eciVoiceTagsEnabled
     }
@@ -154,11 +163,19 @@ fun SettingsScreen(
             is SettingsSubScreen.DICTIONARY_ENTRIES -> currentSubScreen = SettingsSubScreen.LANGUAGE_DICTIONARIES(screen.languageTag)
             is SettingsSubScreen.LANGUAGE_DICTIONARIES -> currentSubScreen = SettingsSubScreen.DICTIONARY_MANAGER
             is SettingsSubScreen.DICTIONARY_MANAGER -> currentSubScreen = SettingsSubScreen.SETTINGS
+            is SettingsSubScreen.FOREGROUND_SERVICE -> currentSubScreen = SettingsSubScreen.SETTINGS
             SettingsSubScreen.SETTINGS -> onNavigateBack()
         }
     }
 
     when (val screen = currentSubScreen) {
+        is SettingsSubScreen.FOREGROUND_SERVICE -> {
+            ForegroundServiceSettingsScreen(
+                settings = settings,
+                onNavigateBack = { currentSubScreen = SettingsSubScreen.SETTINGS }
+            )
+            return
+        }
         is SettingsSubScreen.DICTIONARY_MANAGER -> {
             DictionaryManagerScreen(
                 settings = settings,
@@ -200,13 +217,12 @@ fun SettingsScreen(
                 navigationIcon = {
                     IconButton(
                         onClick = onNavigateBack,
-                        modifier = Modifier.semantics { contentDescription = "Navigate back" }
+                        modifier = Modifier.semantics { contentDescription = "Navigate up" }
                     ) {
-                        Text(
-                            text = "←",
-                            style = MaterialTheme.typography.titleLarge,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onSurface
+                        Icon(
+                            painter = painterResource(id = R.drawable.ic_arrow_back),
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onSurface
                         )
                     }
                 },
@@ -387,7 +403,7 @@ fun SettingsScreen(
 
             SettingsSwitchItem(
                 title = "Use number processing",
-                subtitle = "Format number sequences into digits, pairs, or triplets",
+                subtitle = "Format number sequences into digits, pairs, triplets, or smart grouping",
                 checked = useNumberProcessing,
                 onCheckedChange = {
                     useNumberProcessing = it
@@ -482,13 +498,35 @@ fun SettingsScreen(
                 onClick = { showSamplingDialog = true }
             )
 
+            SettingsClickableItem(
+                title = "Capitals indication",
+                subtitle = capitalsModes.getOrElse(capitalsIndication) { "None" },
+                onClick = { showCapitalsDialog = true }
+            )
+
             HorizontalDivider(
                 modifier = Modifier.padding(vertical = 8.dp),
                 color = DividerDefaults.color.copy(alpha = 0.5f)
             )
 
             // =================================================================
-            // 5. RESET
+            // 6. ADVANCED
+            // =================================================================
+            SettingsCategoryHeader(title = "Advanced")
+
+            SettingsClickableItem(
+                title = "Eloqium foreground service",
+                subtitle = "Improve reliability when Eloqium runs in the background",
+                onClick = { currentSubScreen = SettingsSubScreen.FOREGROUND_SERVICE }
+            )
+
+            HorizontalDivider(
+                modifier = Modifier.padding(vertical = 8.dp),
+                color = DividerDefaults.color.copy(alpha = 0.5f)
+            )
+
+            // =================================================================
+            // 7. RESET
             // =================================================================
             SettingsCategoryHeader(title = "Reset")
 
@@ -658,10 +696,23 @@ fun SettingsScreen(
         onDismiss = { showSamplingDialog = false }
     )
 
+    CapitalsIndicationDialog(
+        visible = showCapitalsDialog,
+        currentMode = capitalsIndication,
+        modes = capitalsModes,
+        onModeSelected = {
+            capitalsIndication = it
+            settings.capitalsIndication = it
+            showCapitalsDialog = false
+        },
+        onDismiss = { showCapitalsDialog = false }
+    )
+
     ResetConfirmationDialog(
         visible = showResetDialog,
         onConfirmReset = {
             settings.resetAll()
+            EloqiumForegroundService.syncService(context, settings)
             refreshAllFromSettings()
             showResetDialog = false
         },

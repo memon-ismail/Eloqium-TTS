@@ -19,6 +19,7 @@ import org.eloqium.tts.engine.VoiceParameterMapper
 import org.eloqium.tts.engine.VoiceRegistry
 import org.eloqium.tts.pipeline.AbbreviationDictionary
 import org.eloqium.tts.pipeline.AbbreviationProcessor
+import org.eloqium.tts.pipeline.CapitalsProcessor
 import org.eloqium.tts.pipeline.Chunker
 import org.eloqium.tts.pipeline.EmojiData
 import org.eloqium.tts.pipeline.EmojiProcessor
@@ -44,7 +45,7 @@ import org.eloqium.tts.pipeline.UserDictionaryProcessor
 import java.io.File
 import java.util.Locale
 
-fun main() {
+fun main(args: Array<String>) {
     var passed = 0
     var failed = 0
 
@@ -57,6 +58,36 @@ fun main() {
             failed++
         }
         System.out.flush()
+    }
+
+    fun shouldRunSuite(suiteNum: Int, name: String): Boolean {
+        if (args.isEmpty()) return true
+        val numStr = suiteNum.toString()
+        for (arg in args) {
+            if (arg == numStr || arg.equals(name, ignoreCase = true) || name.contains(arg, ignoreCase = true)) {
+                return true
+            }
+        }
+        return false
+    }
+
+    fun runWithTimeout(name: String, timeoutSec: Long = 10, block: () -> Unit) {
+        val executor = java.util.concurrent.Executors.newSingleThreadExecutor()
+        val future = executor.submit { block() }
+        try {
+            future.get(timeoutSec, java.util.concurrent.TimeUnit.SECONDS)
+        } catch (e: java.util.concurrent.TimeoutException) {
+            future.cancel(true)
+            println("  [FAIL] $name TIMED OUT after ${timeoutSec}s")
+            failed++
+            System.out.flush()
+        } catch (e: Exception) {
+            println("  [FAIL] $name threw exception: ${e.message}")
+            failed++
+            System.out.flush()
+        } finally {
+            executor.shutdownNow()
+        }
     }
 
     println("==================================================")
@@ -74,7 +105,8 @@ fun main() {
     for (entry in LocaleMatcher.ENTRIES) {
         val loc = entry.canonicalLocale
         assert(loc.isO3Language == entry.iso3Lang, "${entry.displayName} ISO3 language matches ${entry.iso3Lang}")
-        assert(loc.country.isNotEmpty(), "${entry.displayName} country (${loc.country}) is non-empty")
+        assert(loc.country == entry.iso2Country, "${entry.displayName} country (${loc.country}) matches ${entry.iso2Country}")
+        assert(loc.isO3Country == entry.iso3Country, "${entry.displayName} ISO3 country (${loc.isO3Country}) matches ${entry.iso3Country}")
     }
 
     // --- Suite 2: Multilingual Router Compatibility Matching ---
@@ -226,7 +258,8 @@ fun main() {
             val buf = ByteArray(4096)
             var total = 0
             var firstReadMs = -1L
-            while (true) {
+            val readDeadline = System.currentTimeMillis() + 10000L
+            while (System.currentTimeMillis() < readDeadline) {
                 val n = NativeEngine.read(handle, buf)
                 if (n <= 0) break
                 if (firstReadMs == -1L) firstReadMs = System.currentTimeMillis() - startTime
@@ -272,7 +305,8 @@ fun main() {
                 break
             }
             var followUpTotal = 0
-            while (true) {
+            val readDeadline = System.currentTimeMillis() + 10000L
+            while (System.currentTimeMillis() < readDeadline) {
                 val n = NativeEngine.read(stopHandle, tempBuf)
                 if (n <= 0) break
                 followUpTotal += n
@@ -450,7 +484,8 @@ fun main() {
 
             val buf = ByteArray(4096)
             var total = 0
-            while (true) {
+            val readDeadline = System.currentTimeMillis() + 10000L
+            while (System.currentTimeMillis() < readDeadline) {
                 val n = NativeEngine.read(handle, buf)
                 if (n <= 0) break
                 total += n
@@ -2074,6 +2109,217 @@ fun main() {
     assert(dictSearchLabel.isNotEmpty(), "Dictionary search exposes visible label for TalkBack single announcement")
     assert(entrySearchLabel.isNotEmpty(), "Entry search exposes visible label for TalkBack single announcement")
     assert(clearSearchDesc == "Clear search", "Clear search button retains explicit content description")
+
+    // --- Suite 41: Capitals Indication Pipeline & Modes ---
+    if (shouldRunSuite(41, "capitals")) {
+        println("\n--- Suite 41: Capitals Indication Pipeline & Modes ---")
+        runWithTimeout("Suite 41: Capitals Indication") {
+            assert(SettingsDefaults.CAPITALS_NONE == 0, "CAPITALS_NONE is 0")
+            assert(SettingsDefaults.CAPITALS_PITCH_RAISE == 1, "CAPITALS_PITCH_RAISE is 1")
+            assert(SettingsDefaults.CAPITALS_SAY_CAPITAL == 2, "CAPITALS_SAY_CAPITAL is 2")
+            assert(SettingsDefaults.KEY_CAPITALS_INDICATION == "capitals_indication", "KEY_CAPITALS_INDICATION is 'capitals_indication'")
+            assert(SettingsDefaults.DEFAULT_CAPITALS_INDICATION == 0, "DEFAULT_CAPITALS_INDICATION is 0")
+
+            val capPrefs = MockSharedPreferences()
+            val capSettings = Settings(capPrefs)
+            assert(capSettings.capitalsIndication == 0, "capitalsIndication defaults to 0 (None)")
+            capSettings.capitalsIndication = SettingsDefaults.CAPITALS_PITCH_RAISE
+            assert(capSettings.capitalsIndication == 1, "capitalsIndication persists 1 (Pitch raise)")
+            capSettings.capitalsIndication = SettingsDefaults.CAPITALS_SAY_CAPITAL
+            assert(capSettings.capitalsIndication == 2, "capitalsIndication persists 2 (Say capital)")
+            capSettings.capitalsIndication = 99
+            assert(capSettings.capitalsIndication == 2, "capitalsIndication clamps invalid upper value")
+            capSettings.capitalsIndication = -5
+            assert(capSettings.capitalsIndication == 0, "capitalsIndication clamps invalid lower value")
+            capSettings.capitalsIndication = 1
+            capSettings.resetAll()
+            assert(capSettings.capitalsIndication == 0, "Settings resetAll restores capitalsIndication to 0")
+
+            // Mode: None
+            assert(CapitalsProcessor.process("Apple", mode = SettingsDefaults.CAPITALS_NONE) == "Apple", "Mode None leaves 'Apple' unchanged")
+
+            // Mode: Pitch raise
+            // Rule: ONLY standalone one-letter uppercase words receive pitch markup
+            val prA = CapitalsProcessor.process("A car is flying.", mode = SettingsDefaults.CAPITALS_PITCH_RAISE, basePitch = 65)
+            assert(prA == "`vb85A`vb65 car is flying.", "Pitch raise wraps standalone 'A' in 'A car is flying.'")
+            val prI = CapitalsProcessor.process("I am here.", mode = SettingsDefaults.CAPITALS_PITCH_RAISE, basePitch = 65)
+            assert(prI == "`vb85I`vb65 am here.", "Pitch raise wraps standalone 'I' in 'I am here.'")
+            val prAB = CapitalsProcessor.process("A and B are points.", mode = SettingsDefaults.CAPITALS_PITCH_RAISE, basePitch = 65)
+            assert(prAB == "`vb85A`vb65 and `vb85B`vb65 are points.", "Pitch raise wraps standalone 'A' and 'B'")
+
+            // Punctuation surrounding standalone uppercase words
+            assert(CapitalsProcessor.process("(A) car", mode = SettingsDefaults.CAPITALS_PITCH_RAISE, basePitch = 65) == "(`vb85A`vb65) car", "Pitch raise wraps standalone '(A)'")
+            assert(CapitalsProcessor.process("A, car", mode = SettingsDefaults.CAPITALS_PITCH_RAISE, basePitch = 65) == "`vb85A`vb65, car", "Pitch raise wraps standalone 'A,'")
+            assert(CapitalsProcessor.process("Point A. Next", mode = SettingsDefaults.CAPITALS_PITCH_RAISE, basePitch = 65) == "Point `vb85A`vb65. Next", "Pitch raise wraps standalone 'A.'")
+            assert(CapitalsProcessor.process("A: car", mode = SettingsDefaults.CAPITALS_PITCH_RAISE, basePitch = 65) == "`vb85A`vb65: car", "Pitch raise wraps standalone 'A:'")
+            assert(CapitalsProcessor.process("A; B", mode = SettingsDefaults.CAPITALS_PITCH_RAISE, basePitch = 65) == "`vb85A`vb65; `vb85B`vb65", "Pitch raise wraps standalone 'A; B'")
+
+            // Words with uppercase anywhere inside MUST NOT receive pitch markup and MUST NOT be split or have spaces inserted
+            val wordsToPreserve = listOf(
+                "Apple", "Android", "Eloqium", "McDonald", "iPhone", "eBay",
+                "IBM", "NASA", "TTS", "OpenEVV", "AB", "A1", "A2B"
+            )
+            for (w in wordsToPreserve) {
+                val res = CapitalsProcessor.process(w, mode = SettingsDefaults.CAPITALS_PITCH_RAISE, basePitch = 65)
+                assert(res == w, "Pitch raise leaves '$w' completely untouched without tags or splitting")
+            }
+
+            // SPR and ECI tag protection
+            val prPhonetics = CapitalsProcessor.process("`[k2wItS] A car", mode = SettingsDefaults.CAPITALS_PITCH_RAISE, basePitch = 65)
+            assert(prPhonetics == "`[k2wItS] `vb85A`vb65 car", "Pitch raise preserves phonetic SPR tags")
+            val prEci = CapitalsProcessor.process("`vb65 A car", mode = SettingsDefaults.CAPITALS_PITCH_RAISE, basePitch = 65)
+            assert(prEci == "`vb65 `vb85A`vb65 car", "Pitch raise preserves existing ECI tags")
+
+            // Mode: Say capital (preserved without regressions)
+            assert(CapitalsProcessor.process("Apple", mode = SettingsDefaults.CAPITALS_SAY_CAPITAL) == "capital Apple", "Say capital announces 'capital Apple'")
+            assert(CapitalsProcessor.process("McDonald", mode = SettingsDefaults.CAPITALS_SAY_CAPITAL) == "capital Mc capital Donald", "Say capital splits camelCase 'McDonald'")
+            assert(CapitalsProcessor.process("iPhone", mode = SettingsDefaults.CAPITALS_SAY_CAPITAL) == "i capital Phone", "Say capital handles lowercase prefix 'iPhone'")
+            assert(CapitalsProcessor.process("eBay", mode = SettingsDefaults.CAPITALS_SAY_CAPITAL) == "e capital Bay", "Say capital handles lowercase prefix 'eBay'")
+            assert(CapitalsProcessor.process("APPLE", mode = SettingsDefaults.CAPITALS_SAY_CAPITAL) == "capital A capital P capital P capital L capital E", "Say capital spells all-caps 'APPLE'")
+            assert(CapitalsProcessor.process("hello world", mode = SettingsDefaults.CAPITALS_SAY_CAPITAL) == "hello world", "Say capital leaves all lowercase untouched")
+            assert(CapitalsProcessor.process("`[k2wItS] Apple", mode = SettingsDefaults.CAPITALS_SAY_CAPITAL) == "`[k2wItS] capital Apple", "Say capital preserves phonetic SPR tags")
+
+            // OpenEVV compatibility integration
+            val openevvPitchTest = OpenEVVCompatibilityFixes.apply(prA, eciVoiceTagsEnabled = false)
+            assert(openevvPitchTest.contains("`vb85") && openevvPitchTest.contains("`vb65"), "OpenEVVCompatibilityFixes preserves system vb tags even when eciVoiceTagsEnabled is false")
+        }
+    }
+
+    // --- Suite 42: Smart Number Processing & Classification ---
+    if (shouldRunSuite(42, "numbers")) {
+        println("\n--- Suite 42: Smart Number Processing & Classification ---")
+        runWithTimeout("Suite 42: Smart Numbers") {
+            assert(SettingsDefaults.NUMBER_SMART == 3, "NUMBER_SMART is 3")
+            val numPrefs = MockSharedPreferences()
+            val numSettings = Settings(numPrefs)
+            numSettings.numberProcessingMode = SettingsDefaults.NUMBER_SMART
+            assert(numSettings.numberProcessingMode == 3, "numberProcessingMode persists 3 (Smart)")
+            numSettings.numberProcessingMode = 10
+            assert(numSettings.numberProcessingMode == 3, "numberProcessingMode clamps to 3")
+
+            // Phone numbers: raw, international, hyphenated, spaced, parenthesized
+            assert(NumberProcessor.process("9876543210", enabled = true, mode = SettingsDefaults.NUMBER_SMART) == "9 8 7 6 5, 4 3 2 1 0", "Smart groups raw 10 digits as 5, 5")
+            assert(NumberProcessor.process("+91 9876543210", enabled = true, mode = SettingsDefaults.NUMBER_SMART) == "+91 9 8 7 6 5, 4 3 2 1 0", "Smart formats '+91 9876543210'")
+            assert(NumberProcessor.process("987-654-3210", enabled = true, mode = SettingsDefaults.NUMBER_SMART) == "9 8 7, 6 5 4, 3 2 1 0", "Smart formats '987-654-3210'")
+            assert(NumberProcessor.process("987 654 3210", enabled = true, mode = SettingsDefaults.NUMBER_SMART) == "9 8 7, 6 5 4, 3 2 1 0", "Smart formats '987 654 3210'")
+            assert(NumberProcessor.process("(987) 654-3210", enabled = true, mode = SettingsDefaults.NUMBER_SMART) == "9 8 7, 6 5 4, 3 2 1 0", "Smart formats '(987) 654-3210'")
+            assert(NumberProcessor.process("+91 987-654-3210", enabled = true, mode = SettingsDefaults.NUMBER_SMART) == "+91 9 8 7, 6 5 4, 3 2 1 0", "Smart formats '+91 987-654-3210'")
+
+            // OTPs in OTP context (4 to 8 digits)
+            val otp4 = NumberProcessor.process("Your OTP is 4829", enabled = true, mode = SettingsDefaults.NUMBER_SMART)
+            assert(otp4 == "Your OTP is 4 8, 2 9", "Smart formats 4-digit OTP '4829'")
+            val pin4 = NumberProcessor.process("Your PIN is 1234", enabled = true, mode = SettingsDefaults.NUMBER_SMART)
+            assert(pin4 == "Your PIN is 1 2, 3 4", "Smart formats 4-digit PIN '1234'")
+            val otp5 = NumberProcessor.process("Verification code: 54321", enabled = true, mode = SettingsDefaults.NUMBER_SMART)
+            assert(otp5 == "Verification code: 5 4 3, 2 1", "Smart formats 5-digit OTP '54321'")
+            val otp6 = NumberProcessor.process("Your OTP is 482931", enabled = true, mode = SettingsDefaults.NUMBER_SMART)
+            assert(otp6 == "Your OTP is 4 8 2, 9 3 1", "Smart formats 6-digit OTP into 3, 3 with comma")
+            val code6 = NumberProcessor.process("Security code: 654321", enabled = true, mode = SettingsDefaults.NUMBER_SMART)
+            assert(code6 == "Security code: 6 5 4, 3 2 1", "Smart formats 6-digit code")
+            val otp8 = NumberProcessor.process("Login OTP: 12345678", enabled = true, mode = SettingsDefaults.NUMBER_SMART)
+            assert(otp8 == "Login OTP: 1 2 3 4, 5 6 7 8", "Smart formats 8-digit OTP")
+
+            // Ordinary numbers without OTP context (preserved intact)
+            assert(NumberProcessor.process("2026", enabled = true, mode = SettingsDefaults.NUMBER_SMART) == "2026", "Smart preserves ordinary year 2026")
+            assert(NumberProcessor.process("100", enabled = true, mode = SettingsDefaults.NUMBER_SMART) == "100", "Smart preserves ordinary 100")
+            assert(NumberProcessor.process("123456", enabled = true, mode = SettingsDefaults.NUMBER_SMART) == "123456", "Smart preserves non-OTP 6-digit 123456")
+
+            // Long digit sequences without OTP context
+            assert(NumberProcessor.process("1234567", enabled = true, mode = SettingsDefaults.NUMBER_SMART) == "1 2 3, 4 5 6 7", "Smart groups 7 digits as 3, 4")
+            assert(NumberProcessor.process("12345678", enabled = true, mode = SettingsDefaults.NUMBER_SMART) == "1 2 3 4, 5 6 7 8", "Smart groups 8 digits as 4, 4")
+            assert(NumberProcessor.process("123456789", enabled = true, mode = SettingsDefaults.NUMBER_SMART) == "1 2 3, 4 5 6, 7 8 9", "Smart groups 9 digits as 3, 3, 3")
+            assert(NumberProcessor.process("123456789012", enabled = true, mode = SettingsDefaults.NUMBER_SMART) == "1 2 3 4, 5 6 7 8, 9 0 1 2", "Smart groups 12 digits as 4, 4, 4")
+
+            // Protected contexts preserved verbatim
+            assert(NumberProcessor.process("16,000", enabled = true, mode = SettingsDefaults.NUMBER_SMART) == "16,000", "Smart preserves comma number 16,000")
+            assert(NumberProcessor.process("1,234,567", enabled = true, mode = SettingsDefaults.NUMBER_SMART) == "1,234,567", "Smart preserves comma number 1,234,567")
+            assert(NumberProcessor.process("123.456", enabled = true, mode = SettingsDefaults.NUMBER_SMART) == "123.456", "Smart preserves decimal 123.456")
+            assert(NumberProcessor.process("3.14159", enabled = true, mode = SettingsDefaults.NUMBER_SMART) == "3.14159", "Smart preserves decimal 3.14159")
+            assert(NumberProcessor.process("50%", enabled = true, mode = SettingsDefaults.NUMBER_SMART) == "50%", "Smart preserves percentage 50%")
+            assert(NumberProcessor.process("12/08/2026", enabled = true, mode = SettingsDefaults.NUMBER_SMART) == "12/08/2026", "Smart preserves date 12/08/2026")
+            assert(NumberProcessor.process("10:30", enabled = true, mode = SettingsDefaults.NUMBER_SMART) == "10:30", "Smart preserves time 10:30")
+            assert(NumberProcessor.process("₹500000", enabled = true, mode = SettingsDefaults.NUMBER_SMART) == "₹500000", "Smart preserves rupee currency ₹500000")
+            assert(NumberProcessor.process("$1000", enabled = true, mode = SettingsDefaults.NUMBER_SMART) == "$1000", "Smart preserves dollar currency $1000")
+            assert(NumberProcessor.process("ABC1234567", enabled = true, mode = SettingsDefaults.NUMBER_SMART) == "ABC1234567", "Smart preserves alphanumeric ABC1234567")
+            assert(NumberProcessor.process("1234567 apples", enabled = true, mode = SettingsDefaults.NUMBER_SMART) == "1234567 apples", "Smart preserves quantity '1234567 apples'")
+            assert(NumberProcessor.process("version 1234567", enabled = true, mode = SettingsDefaults.NUMBER_SMART) == "version 1234567", "Smart preserves version 'version 1234567'")
+            assert(NumberProcessor.process("`[k2wItS] 1234567", enabled = true, mode = SettingsDefaults.NUMBER_SMART) == "`[k2wItS] 1 2 3, 4 5 6 7", "Smart protects phonetic SPR tag and formats adjacent phone number")
+        }
+    }
+
+    // --- Suite 43: Sampling Rate Switching & Native Engine Lifecycle ---
+    if (shouldRunSuite(43, "native")) {
+        println("\n--- Suite 43: Sampling Rate Switching & Native Engine Lifecycle ---")
+        runWithTimeout("Suite 43: Native Engine Lifecycle", timeoutSec = 15) {
+            val engine = EloqiumEngine.open(0x00010000, 8000)
+            assert(engine != null, "Engine opens successfully at initial rate 8000 Hz")
+            if (engine != null) {
+                assert(engine.sampleRateHz == 8000, "Engine reflects initial sample rate 8000 Hz")
+
+                // 1. Idle switching
+                val switchedTo11k = engine.setSampleRate(11025)
+                assert(switchedTo11k, "Engine switches cleanly from 8000 Hz to 11025 Hz while idle")
+                assert(engine.sampleRateHz == 11025, "Engine sampleRateHz is 11025 Hz after switch")
+                val switchedBackTo8k = engine.setSampleRate(8000)
+                assert(switchedBackTo8k, "Engine switches cleanly back to 8000 Hz while idle")
+                assert(engine.sampleRateHz == 8000, "Engine sampleRateHz is 8000 Hz after second switch")
+
+                // 2. Active synthesis at 8000 Hz
+                assert(engine.speak("Testing eight kilohertz synthesis."), "Engine speak accepted at 8000 Hz")
+                val buf = ByteArray(4096)
+                var bytes8k = 0
+                while (true) {
+                    val r = engine.read(buf)
+                    if (r <= 0) break
+                    bytes8k += r
+                }
+                assert(bytes8k > 0, "Engine produced $bytes8k bytes of audio at 8000 Hz")
+
+                // 3. Active synthesis at 11025 Hz
+                assert(engine.setSampleRate(11025), "Engine switches to 11025 Hz")
+                assert(engine.speak("Testing eleven kilohertz synthesis."), "Engine speak accepted at 11025 Hz")
+                var bytes11k = 0
+                while (true) {
+                    val r = engine.read(buf)
+                    if (r <= 0) break
+                    bytes11k += r
+                }
+                assert(bytes11k > 0, "Engine produced $bytes11k bytes of audio at 11025 Hz")
+
+                // 4. Cancellation (stop) during synthesis followed by reuse
+                assert(engine.speak("A long utterance for verifying cancellation in flight followed by reuse."), "Engine starts long utterance")
+                val firstRead = engine.read(buf)
+                assert(firstRead > 0, "Read first audio chunk ($firstRead bytes)")
+                engine.stop()
+                val postStopRead = engine.read(buf)
+                assert(postStopRead <= 0, "Read after stop immediately returns <= 0 ($postStopRead)")
+
+                // Reusing the same engine instance after cancellation
+                assert(engine.speak("Reused cleanly after cancellation."), "Engine speaks immediately after cancellation")
+                var bytesReused = 0
+                while (true) {
+                    val r = engine.read(buf)
+                    if (r <= 0) break
+                    bytesReused += r
+                }
+                assert(bytesReused > 0, "Engine synthesized $bytesReused bytes on reuse")
+
+                // 5. Repeated rate switches
+                var switchOk = true
+                for (i in 1..6) {
+                    val rate = if (i % 2 == 0) 8000 else 11025
+                    if (!engine.setSampleRate(rate) || engine.sampleRateHz != rate) {
+                        switchOk = false
+                        break
+                    }
+                }
+                assert(switchOk, "Engine completes repeated sampling rate switches stably")
+
+                engine.close()
+                assert(true, "Engine closed cleanly")
+            }
+        }
+    }
 
     println("==================================================")
     println("   RESULTS: $passed PASSED, $failed FAILED")

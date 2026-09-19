@@ -15,6 +15,7 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -55,14 +56,13 @@ fun AboutScreen(
                     IconButton(
                         onClick = onNavigateBack,
                         modifier = Modifier.semantics {
-                            contentDescription = "Navigate back"
+                            contentDescription = "Navigate up"
                         }
                     ) {
-                        Text(
-                            text = "←",
-                            style = MaterialTheme.typography.titleLarge,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onSurface
+                        Icon(
+                            painter = painterResource(id = R.drawable.ic_arrow_back),
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onSurface
                         )
                     }
                 },
@@ -183,7 +183,7 @@ private fun AboutProjectSection() {
             Spacer(modifier = Modifier.height(8.dp))
             InfoRow(label = "Engine Identifier", value = "Eloqium TTS (org.eloqium.tts)")
             Spacer(modifier = Modifier.height(8.dp))
-            InfoRow(label = "Version", value = "0.1.3")
+            InfoRow(label = "Version", value = "0.1.4")
             Spacer(modifier = Modifier.height(8.dp))
             InfoRow(label = "License", value = "Apache License 2.0 (Open Source)")
             Spacer(modifier = Modifier.height(8.dp))

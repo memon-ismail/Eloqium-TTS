@@ -1,0 +1,27 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import LinkArrow from '../components/LinkArrow.astro';
+import { voicePresets, voiceVariants } from '../data/site';
+---
+
+<BaseLayout
+  title="Voices | Eloqium TTS"
+  description="Browse the eight Eloqium TTS regional language variants and the eight voice presets available for each one."
+  currentPath="/voices/"
+>
+  <div class="shell"><header class="page-intro"><p class="eyebrow">Voices</p><h1>Choose a language, then choose a voice.</h1><p class="page-lead">Eloqium currently provides eight regional language variants. Each variant includes the same set of eight voice presets.</p></header></div>
+
+  <section class="page-section" aria-labelledby="regional-heading">
+    <div class="shell"><div class="section-heading"><p class="eyebrow">Languages</p><h2 id="regional-heading">Available regional variants.</h2></div>
+      <div class="voice-table-wrap"><table class="voice-table"><caption class="sr-only">Eloqium TTS supported regional language variants</caption><thead><tr><th scope="col">Language</th><th scope="col">Region</th><th scope="col">Locale</th></tr></thead><tbody>{voiceVariants.map((voice) => <tr><th scope="row">{voice.language}</th><td>{voice.region}</td><td><code>{voice.tag}</code></td></tr>)}</tbody></table></div>
+    </div>
+  </section>
+
+  <section class="page-section alt" aria-labelledby="preset-heading">
+    <div class="shell capability-layout"><div><p class="eyebrow">Voice presets</p><h2 id="preset-heading">Eight names are available in every region.</h2><p>Choose a preset under <strong>Settings → Voice → Voice profile</strong>.</p></div><ol class="preset-list">{voicePresets.map((preset) => <li><strong>{preset}</strong></li>)}</ol></div>
+  </section>
+
+  <section class="page-section" aria-labelledby="voice-guide-heading">
+    <div class="shell narrow-copy"><p class="eyebrow">Using the voices</p><h2 id="voice-guide-heading">Choose the language in Eloqium, then select the voice profile.</h2><p>Android TTS clients can also request supported language variants through the standard TTS interface.</p><div class="inline-links"><LinkArrow href="/guide/" label="See the voice setup steps" /><LinkArrow href="/download/" label="Download Eloqium" /></div></div>
+  </section>
+</BaseLayout>

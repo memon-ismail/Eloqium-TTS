@@ -1,7 +1,7 @@
 # Third-Party Licenses and Legal Notices
 
 Eloqium TTS incorporates or links against several open-source libraries and projects.
-Below are the complete licenses and copyright notices for each component.
+Below are the relevant licenses and copyright notices required for each component incorporated into or referenced by this project.
 
 ---
 
@@ -74,7 +74,7 @@ provided with the OpenEVV project repository.
 - **Notice**: The NVDA IBMTTS Driver was consulted strictly as a functional, behavioral,
   and documentation reference for ECI command sequences, punctuation verbosity levels,
   and parameter scaling. **No source code from NVDA IBMTTS Driver is incorporated or
-  copied into Eloqium TTS**, preserving strict Apache-2.0 clean-room compliance.
+  copied into Eloqium TTS**, maintaining independent implementation under the Apache-2.0 license.
 
 ---
 

@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 630" role="img" aria-labelledby="title desc">
+  <title id="title">Eloqium TTS</title>
+  <desc id="desc">An open-source alternative to Eloquence TTS for Android.</desc>
+  <rect width="1200" height="630" fill="#f4f1e8"/>
+  <rect x="58" y="58" width="1084" height="514" rx="28" fill="#242852"/>
+  <circle cx="985" cy="120" r="190" fill="#3652f4" opacity=".86"/>
+  <circle cx="120" cy="548" r="170" fill="#bfe9d2" opacity=".9"/>
+  <path d="M88 426c110-76 210 46 320-31 108-75 180-56 282-6 102 50 174 62 294-25" fill="none" stroke="#f4f1e8" stroke-width="11" stroke-linecap="round" opacity=".82"/>
+  <text x="92" y="172" fill="#bfe9d2" font-family="Arial, sans-serif" font-size="24" letter-spacing="4">ANDROID TEXT TO SPEECH</text>
+  <text x="88" y="278" fill="#ffffff" font-family="Arial, sans-serif" font-size="82" font-weight="700">Eloqium TTS</text>
+  <text x="94" y="338" fill="#ffffff" font-family="Arial, sans-serif" font-size="30">An open-source alternative to Eloquence TTS for Android.</text>
+</svg>

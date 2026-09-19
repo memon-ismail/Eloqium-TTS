@@ -1,0 +1,204 @@
+@media (max-width: 1000px) {
+  .primary-navigation a {
+    padding-inline: 0.52rem;
+  }
+
+  .home-hero-grid,
+  .download-hero-grid,
+  .download-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .home-hero-main {
+    max-width: 760px;
+  }
+
+  .home-hero .release-card {
+    max-width: 620px;
+  }
+
+  .guide-map-inner {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .guide-map a:nth-child(3) {
+    border-right: 0;
+  }
+
+  .release-history {
+    grid-template-columns: 1fr;
+  }
+
+  .release-history > .section-heading {
+    position: static;
+    margin-bottom: 0.4rem;
+  }
+}
+
+@media (max-width: 760px) {
+  .shell,
+  .narrow-copy {
+    width: min(calc(100% - 2rem), var(--shell));
+  }
+
+  .header-inner {
+    min-height: 68px;
+  }
+
+  .primary-navigation {
+    right: 1rem;
+  }
+
+  .page-intro {
+    padding: 4.2rem 0 3.6rem;
+  }
+
+  h1 {
+    font-size: clamp(2.5rem, 11vw, 4rem);
+  }
+
+  h2 {
+    font-size: clamp(1.9rem, 8.5vw, 3rem);
+  }
+
+  .split-section,
+  .about-layout,
+  .feature-list-layout,
+  .voice-preset-layout,
+  .dictionary-matching,
+  .privacy-facts,
+  .guide-layout,
+  .source-history-grid,
+  .install-grid,
+  .capability-layout,
+  .home-start-grid {
+    grid-template-columns: 1fr;
+    gap: 2.6rem;
+  }
+
+  .home-capability-grid,
+  .content-grid.three-up,
+  .content-grid.two-up,
+  .license-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .home-capability {
+    min-height: 220px;
+  }
+
+  .content-card {
+    min-height: 240px;
+  }
+
+  .band-inner {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .task-grid,
+  .about-links-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .guide-map-inner {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .guide-map a:nth-child(3) {
+    border-right: 1px solid var(--line);
+  }
+
+  .guide-map a:nth-child(even) {
+    border-right: 0;
+  }
+
+  .footer-inner {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 0.6rem;
+  }
+
+  .primary-navigation {
+    width: min(28rem, calc(100vw - 2rem));
+  }
+}
+
+@media (max-width: 520px) {
+  .button-row,
+  .button-row .button,
+  .download-actions,
+  .download-actions .button {
+    width: 100%;
+  }
+
+  .button-row,
+  .download-actions {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .hero-logo {
+    width: 72px;
+    height: 72px;
+  }
+
+  .home-hero .release-card {
+    padding: 1.2rem;
+  }
+
+  .release-card-top,
+  .release-entry-header,
+  .license-list li {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .preset-list {
+    grid-template-columns: 1fr;
+  }
+
+  .detail-list div,
+  .definition-list div {
+    grid-template-columns: 1fr;
+    gap: 0.35rem;
+  }
+
+  .guide-map-inner {
+    grid-template-columns: 1fr;
+  }
+
+  .guide-map a,
+  .guide-map a:nth-child(3),
+  .guide-map a:nth-child(even) {
+    border-right: 0;
+    border-bottom: 1px solid var(--line);
+  }
+
+  .guide-map a:last-child {
+    border-bottom: 0;
+  }
+
+  .license-list span {
+    text-align: left;
+  }
+
+  .release-entry-footer {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
+  *,
+  *::before,
+  *::after {
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+  }
+}
