@@ -17,8 +17,7 @@ import { currentRelease, site } from '../data/site';
         <p class="eyebrow">Current release</p>
         <div class="version-lockup"><strong>{currentRelease.version}</strong><span>{currentRelease.title}</span></div>
         <p>{currentRelease.summary}</p>
-        <p>The current application version is {currentRelease.version}. The latest verified public release APK available for download is v0.1.3.</p>
-        <div class="download-actions"><a class="button button-primary" href="https://github.com/memon-ismail/Eloqium-TTS/releases/download/v0.1.3/eloqium-tts-release.apk">Download v0.1.3 APK <span aria-hidden="true">↓</span></a><a class="button button-secondary" href="/releases/">View release history</a></div>
+        <div class="download-actions"><a class="button button-primary" href={currentRelease.downloadUrl}>Download {currentRelease.version} APK <span aria-hidden="true">↓</span></a><a class="button button-secondary" href="/releases/">View release history</a></div>
       </div>
       <div class="download-facts">
         <h2 id="download-heading">Before installing</h2>

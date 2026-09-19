@@ -87,8 +87,8 @@ export const releases = [
     title: 'Foreground Service & Text Processing',
     date: '18 September 2026',
     summary: 'Adds Smart number processing, standalone capital indication, and optional foreground-service controls.',
-    downloadUrl: '',
-    githubUrl: 'https://github.com/memon-ismail/Eloqium-TTS/releases',
+    downloadUrl: 'https://github.com/memon-ismail/Eloqium-TTS/releases/download/v0.1.4/eloqium-tts-release.apk',
+    githubUrl: 'https://github.com/memon-ismail/Eloqium-TTS/releases/tag/v0.1.4',
     changes: [
       'Add Smart number processing for context-aware number formatting.',
       'Add capital indication pitch raise for standalone uppercase single-letter words.',
